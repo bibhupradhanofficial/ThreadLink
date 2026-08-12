@@ -58,7 +58,7 @@ export function ContinuityPanel({
             {tab === "issues"
               ? "Continuity Engine"
               : tab === "bible"
-                ? "Story Bible Canon"
+                ? "Story Bible Thread"
                 : "Cast Relationship Map"}
           </p>
           <span className="flex h-2 w-2 rounded-full bg-gold animate-pulse" />
@@ -67,7 +67,7 @@ export function ContinuityPanel({
           {tab === "cast"
             ? "Extracted character network & ties"
             : tab === "bible"
-              ? "Living canon facts & version history"
+              ? "Living thread facts & version history"
               : checking
                 ? "Analyzing manuscript claims..."
                 : !checked
@@ -117,7 +117,7 @@ export function ContinuityPanel({
           <div className="mt-20 flex flex-col items-center px-6 text-center">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
             <p className="mt-4 font-serif text-sm font-semibold text-ink">
-              Analyzing Canon Entailment
+              Analyzing Thread Entailment
             </p>
             <p className="mt-1 animate-pulse text-xs text-ink-faint">
               {checkPhase}

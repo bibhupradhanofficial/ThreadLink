@@ -74,7 +74,7 @@ export function Cast({ bookId }: { bookId: string }) {
       <div className="mt-16 flex flex-col items-center text-center">
         <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
         <p className="mt-3 font-serif text-xs text-ink-faint">
-          Mapping character ties from Supermemory canon…
+          Mapping character ties from Supermemory thread…
         </p>
       </div>
     );

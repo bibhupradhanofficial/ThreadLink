@@ -97,23 +97,26 @@ async def _raw_completion(kwargs: dict) -> str:
 
             # Automatic model fallbacks if primary model rate-limits
             current_model = kwargs.get("model", "")
-            fallback_model = None
-            if "gemini-3.6-flash" in current_model and attempt == 0:
-                fallback_model = "gemini/gemini-flash-latest"
-            elif "groq/llama-3.3-70b-versatile" in current_model and attempt == 0:
-                fallback_model = "groq/llama-3.1-8b-instant"
+            fallbacks: list[str] = []
+            if "gemini" in current_model:
+                fallbacks = ["gemini/gemini-3.6-flash", "gemini/gemini-flash-latest", "gemini/gemini-3.5-flash-lite"]
+            elif "groq" in current_model:
+                fallbacks = ["groq/llama-3.3-70b-versatile", "groq/llama-3.1-8b-instant"]
 
-            if fallback_model:
+            for fb_model in fallbacks:
+                if fb_model == current_model:
+                    continue
                 logger.warning(
                     "Rate limit on %s. Attempting fallback to %s...",
-                    current_model, fallback_model
+                    current_model, fb_model
                 )
                 try:
-                    fallback_kwargs = {**kwargs, "model": fallback_model}
+                    fallback_kwargs = {**kwargs, "model": fb_model}
                     resp = await litellm.acompletion(**fallback_kwargs, num_retries=1)
-                    return resp.choices[0].message.content or ""
+                    if resp.choices[0].message.content:
+                        return resp.choices[0].message.content
                 except Exception as fb_err:
-                    logger.warning("Fallback model %s failed: %s", fallback_model, fb_err)
+                    logger.warning("Fallback model %s failed: %s", fb_model, fb_err)
 
             logger.warning(
                 "%s rate limited after retries (retry_after=%s)",

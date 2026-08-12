@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+import { ThreadLinkLogo } from "./Logo";
 import type { Book } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +111,7 @@ function BookSwitcher({
       </button>
 
       {open && (
-        <div className="animate-fade-in absolute left-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-border bg-paper-raised p-1.5 shadow-xl glass-panel">
+        <div className="animate-fade-in absolute left-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-border bg-paper-raised p-1.5 shadow-2xl opacity-100">
           {active && (
             <>
               <div className="px-1 py-1">
@@ -170,10 +171,15 @@ function BookSwitcher({
                 {books.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => onDeleteBook(b.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Delete manuscript "${b.title}"?`)) {
+                        onDeleteBook(b.id);
+                      }
+                    }}
                     aria-label={`Delete book ${b.title}`}
                     title="Delete book"
-                    className="shrink-0 cursor-pointer rounded p-1 text-ink-faint opacity-0 transition-opacity hover:text-flag-red focus:opacity-100 group-hover:opacity-100"
+                    className="shrink-0 cursor-pointer rounded p-1 text-ink-faint opacity-70 transition-opacity hover:bg-flag-red/10 hover:text-flag-red focus:opacity-100 group-hover:opacity-100"
                   >
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                       <path d="M3 4.5h10M6.5 4.5V3.5a1 1 0 011-1h1a1 1 0 011 1v1M5 4.5l.5 8a1 1 0 001 1h3a1 1 0 001-1l.5-8" />
@@ -210,6 +216,7 @@ export function TopBar({
   onDeleteBook,
   chapterTitle,
   saveState,
+  aiError,
   unresolvedCount,
   onCheckContinuity,
   checking,
@@ -224,6 +231,7 @@ export function TopBar({
   onDeleteBook: (id: string) => void;
   chapterTitle: string;
   saveState: SaveState;
+  aiError?: string | null;
   unresolvedCount: number;
   onCheckContinuity: () => void;
   checking: boolean;
@@ -231,7 +239,7 @@ export function TopBar({
   onTogglePanel: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-paper-raised/60 px-4 backdrop-blur-md">
+    <header className="relative z-50 flex h-14 shrink-0 items-center justify-between border-b border-border bg-paper-raised/60 px-4 backdrop-blur-md">
       <div className="flex min-w-0 items-center gap-1.5">
         <IconButton onClick={onToggleSidebar} label="Toggle chapter list">
           <PanelIcon side="left" />
@@ -242,7 +250,7 @@ export function TopBar({
             title="Back to manuscript landing page"
             className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 font-serif text-sm font-bold tracking-tight text-ink transition-colors hover:text-gold-strong"
           >
-            <span className="text-gold-strong">✦</span> ThreadLink
+            <ThreadLinkLogo className="h-6 w-6" /> ThreadLink
           </Link>
           <span className="text-xs text-ink-faint">/</span>
           <BookSwitcher
@@ -261,6 +269,15 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-3">
+        {aiError && (
+          <span
+            className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold-soft px-2.5 py-0.5 text-xs font-semibold text-gold-strong animate-pulse"
+            title={aiError}
+          >
+            <span>⏳</span> {aiError}
+          </span>
+        )}
+
         {saveState === "offline" ? (
           <span
             className="flex items-center gap-1.5 rounded-full border border-flag/30 bg-flag-soft px-2.5 py-0.5 text-xs font-semibold text-flag"
@@ -272,7 +289,7 @@ export function TopBar({
         ) : (
           <span className="flex items-center gap-1.5 text-xs text-ink-faint">
             <span className={cn("h-1.5 w-1.5 rounded-full", saveState === "saving" ? "bg-gold animate-ping" : "bg-kept")} />
-            {saveState === "saving" ? "Saving…" : "Canon Synced"}
+            {saveState === "saving" ? "Saving…" : "Thread Synced"}
           </span>
         )}
 
@@ -291,7 +308,7 @@ export function TopBar({
           {checking ? (
             <>
               <span className="h-2 w-2 animate-spin rounded-full border-2 border-paper border-t-transparent" />
-              Scanning Canon…
+              Scanning Thread…
             </>
           ) : (
             <>

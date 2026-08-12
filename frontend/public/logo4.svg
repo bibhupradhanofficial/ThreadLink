@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" fill="none" width="100%" height="100%">
+  <defs>
+    <!-- Dark Obsidian Paper Background (ThreadLink Theme) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0d11" />
+      <stop offset="50%" stop-color="#131720" />
+      <stop offset="100%" stop-color="#07080b" />
+    </linearGradient>
+
+    <!-- Container Border - Literary Gold & Slate Indigo -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e5a93c" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#212734" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#5a8bd8" stop-opacity="0.8" />
+    </linearGradient>
+
+    <!-- Thread Ribbon Gradient (Terracotta Crimson -> Gold -> Slate Indigo -> Muted Sage) -->
+    <linearGradient id="threadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea7a47" />
+      <stop offset="28%" stop-color="#e5a93c" />
+      <stop offset="65%" stop-color="#5a8bd8" />
+      <stop offset="100%" stop-color="#63b378" />
+    </linearGradient>
+
+    <!-- Gold Accent Gradient -->
+    <linearGradient id="goldMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="40%" stop-color="#e5a93c" />
+      <stop offset="100%" stop-color="#c28e2b" />
+    </linearGradient>
+
+    <!-- Soft Ambient Light Radial Glow -->
+    <radialGradient id="ambientGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#e5a93c" stop-opacity="0.18" />
+      <stop offset="55%" stop-color="#5a8bd8" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#0b0d11" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Container Soft Drop Shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.65" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#5a8bd8" flood-opacity="0.15" />
+    </filter>
+
+    <!-- Thread Neon Glow Filter -->
+    <filter id="threadGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur1" />
+      <feGaussianBlur stdDeviation="14" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Squircle Emblem Container -->
+  <rect x="25" y="25" width="450" height="450" rx="92" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="2.5" filter="url(#shadow)" />
+  <rect x="27" y="27" width="446" height="446" rx="90" fill="url(#ambientGlow)" pointer-events="none" />
+
+  <!-- Subtle Background Constellation Rings -->
+  <g opacity="0.1" stroke="#f0f2f7" stroke-width="1">
+    <circle cx="250" cy="250" r="165" stroke-dasharray="4 8" fill="none" />
+    <circle cx="250" cy="250" r="105" stroke-dasharray="3 6" fill="none" />
+    <line x1="250" y1="70" x2="250" y2="430" stroke-dasharray="2 8" />
+    <line x1="70" y1="250" x2="430" y2="250" stroke-dasharray="2 8" />
+  </g>
+
+  <!-- Iconic Threads '@' Continuous Fluid Loop -->
+  <g filter="url(#threadGlow)">
+    <!-- Main Glowing Ribbon Stroke -->
+    <path d="M 270 205
+             C 230 205, 200 230, 200 260
+             C 200 290, 230 310, 265 310
+             C 295 310, 315 290, 315 260
+             C 315 210, 275 160, 220 160
+             C 155 160, 130 220, 130 270
+             C 130 340, 185 375, 260 375
+             C 325 375, 375 330, 375 260
+             C 375 200, 345 170, 315 170"
+          fill="none"
+          stroke="url(#threadGradient)"
+          stroke-width="16"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+
+    <!-- Pure Core White Shine Accent -->
+    <path d="M 270 205
+             C 230 205, 200 230, 200 260
+             C 200 290, 230 310, 265 310
+             C 295 310, 315 290, 315 260
+             C 315 210, 275 160, 220 160
+             C 155 160, 130 220, 130 270
+             C 130 340, 185 375, 260 375
+             C 325 375, 375 330, 375 260
+             C 375 200, 345 170, 315 170"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          opacity="0.65" />
+  </g>
+
+  <!-- Interactive Story Connection Nodes (ThreadLink Signature) -->
+  <!-- Inner Loop Node: Gold Star Spark -->
+  <g transform="translate(270, 205)" filter="url(#threadGlow)">
+    <circle cx="0" cy="0" r="11" fill="#fef08a" />
+    <circle cx="0" cy="0" r="6" fill="#e5a93c" />
+    <circle cx="0" cy="0" r="2.5" fill="#ffffff" />
+  </g>
+
+  <!-- Bottom Core Node: Terracotta Crimson Dot -->
+  <g transform="translate(260, 375)" filter="url(#threadGlow)">
+    <circle cx="0" cy="0" r="8" fill="#ea7a47" />
+    <circle cx="0" cy="0" r="3.5" fill="#ffffff" />
+  </g>
+
+  <!-- Terminating Outer Node: Slate Indigo Sparkle -->
+  <g transform="translate(315, 170)" filter="url(#threadGlow)">
+    <circle cx="0" cy="0" r="10" fill="#5a8bd8" />
+    <circle cx="0" cy="0" r="5" fill="#ffffff" />
+    <!-- 4-point Diamond Sparkle -->
+    <path d="M 0 -8 L 2 -2 L 8 0 L 2 2 L 0 8 L -2 2 L -8 0 L -2 -2 Z" fill="#ffffff" />
+  </g>
+</svg>

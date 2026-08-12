@@ -88,16 +88,20 @@ async def _check_against_canon(
             hits = await memory.search_derived(
                 q, book_id, chapter_index_lt=chapter_index + 1
             )
+        if not hits:
+            hits = await memory.search_facts(
+                f.entity, book_id, chapter_index_lt=chapter_index + 1
+            )
         return hits
 
     async def search_claim(c: Claim) -> list[dict]:
         q = f"{c.entity}: {c.presupposedState}"
-        hits = await memory.search_facts(q, book_id, chapter_index_lt=chapter_index)
+        hits = await memory.search_facts(q, book_id, chapter_index_lt=chapter_index + 1)
         if not hits:
-            hits = await memory.search_derived(q, book_id, chapter_index_lt=chapter_index)
+            hits = await memory.search_derived(q, book_id, chapter_index_lt=chapter_index + 1)
         if not hits:  # last resort: a plain entity search over curated canon
             hits = await memory.search_facts(
-                c.entity, book_id, chapter_index_lt=chapter_index
+                c.entity, book_id, chapter_index_lt=chapter_index + 1
             )
         return hits
 
@@ -124,7 +128,8 @@ async def _check_against_canon(
             if _norm(prior["memory"]) == _norm(f.statement):
                 continue  # unchanged re-check — already stored
             revise_id = prior["id"]
-        if not canon_hits:
+        effective_canon = canon_hits + [h for h in same_hits if h.get("id") != revise_id]
+        if not effective_canon:
             if revise_id:
                 to_update.append((revise_id, f))
             else:
@@ -135,23 +140,51 @@ async def _check_against_canon(
                 "itemIndex": len(judged_items),
                 "kind": "fact",
                 "statement": f.statement,
-                "canon": _canon_payload(canon_hits),
+                "canon": _canon_payload(effective_canon),
             }
         )
-        judged_meta.append(("fact", f, {h["id"]: h for h in canon_hits}, revise_id))
+        judged_meta.append(("fact", f, {h["id"]: h for h in effective_canon}, revise_id))
+
+    # Prepare pseudo-canon hits from current paragraph facts to catch intra-paragraph contradictions.
+    para_fact_hits = [
+        {
+            "id": f"para-{hashlib.md5(f.statement.encode('utf-8')).hexdigest()[:8]}",
+            "memory": f.statement,
+            "metadata": {
+                "entity": f.entity,
+                "attribute": f.attribute,
+                "excerpt": f.excerpt,
+                "chapterId": chapter_id,
+                "chapterTitle": chapter_title,
+                "chapterIndex": chapter_index,
+            },
+            "source": "curated",
+        }
+        for f in facts
+    ]
 
     for c, hits in zip(claims, claim_hits):
-        if not hits:
-            continue  # transient claim with no relevant canon → nothing to do
+        # Merge Supermemory search hits with same-paragraph facts for the same entity
+        combined_hits = list(hits)
+        entity_norm = c.entity.strip().lower()
+        for pf in para_fact_hits:
+            pf_entity = str(pf["metadata"].get("entity", "")).strip().lower()
+            if pf_entity == entity_norm or entity_norm in pf_entity or pf_entity in entity_norm:
+                if not any(_norm(h.get("memory", "")) == _norm(pf["memory"]) for h in combined_hits):
+                    combined_hits.append(pf)
+
+        if not combined_hits:
+            continue  # transient claim with no relevant canon or paragraph fact → nothing to do
+
         judged_items.append(
             {
                 "itemIndex": len(judged_items),
                 "kind": "claim",
                 "presupposedState": c.presupposedState,
-                "canon": _canon_payload(hits),
+                "canon": _canon_payload(combined_hits),
             }
         )
-        judged_meta.append(("claim", c, {h["id"]: h for h in hits}, None))
+        judged_meta.append(("claim", c, {h["id"]: h for h in combined_hits}, None))
 
     # 3. One batched judge call for the whole paragraph.
     verdicts = (await judge(judged_items)).verdicts if judged_items else []

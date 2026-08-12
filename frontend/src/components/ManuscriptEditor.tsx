@@ -101,6 +101,7 @@ export function ManuscriptEditor({
   onContentChange,
   onContradictionsDetected,
   onCanonChanged,
+  onErrorState,
   onRename,
   prevChapter,
   nextChapter,
@@ -119,6 +120,7 @@ export function ManuscriptEditor({
     scope?: { chapterId: string; paragraphIndex: number },
   ) => void;
   onCanonChanged: () => void;
+  onErrorState?: (error: string | null) => void;
   onRename: (chapterId: string, title: string) => void;
   prevChapter?: Chapter;
   nextChapter?: Chapter;
@@ -142,6 +144,7 @@ export function ManuscriptEditor({
     chapterTitle: chapter.title,
     onContradictionsDetected,
     onCanonChanged,
+    onErrorState,
   });
   useEffect(() => {
     liveProps.current = {
@@ -151,8 +154,14 @@ export function ManuscriptEditor({
       chapterTitle: chapter.title,
       onContradictionsDetected,
       onCanonChanged,
+      onErrorState,
     };
   });
+
+  const scheduleCheckRef = useRef<() => void>(() => {});
+  const scheduleParagraphCheck = useCallback(() => {
+    scheduleCheckRef.current();
+  }, []);
 
   const checkOneParagraph = useCallback(async (para: Para) => {
     const editor = editorRef.current;
@@ -174,6 +183,9 @@ export function ManuscriptEditor({
         precedingContext: para.preceding || undefined,
         paragraphIndex: para.index,
       });
+      // Clear any prior rate limit or error notice
+      p.onErrorState?.(null);
+
       // Facts were stored/updated → canon changed, refresh the Story Bible.
       if (result.facts.length > 0) p.onCanonChanged();
       for (const c of result.contradictions) {
@@ -191,10 +203,18 @@ export function ManuscriptEditor({
         chapterId: p.chapterId,
         paragraphIndex: para.index,
       });
-    } catch {
-      // Backend offline / transient — stay silent, writing must not be blocked.
-      // Release the claim so a later edit can retry this paragraph.
-      checkedParagraphs.current.delete(trimmed);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes("429") || msg.includes("rate limit") || msg.includes("quota")) {
+        p.onErrorState?.("AI Rate Limit Reached — retrying shortly");
+        setTimeout(() => {
+          checkedParagraphs.current.delete(trimmed);
+          scheduleCheckRef.current();
+        }, 8000);
+      } else {
+        p.onErrorState?.("AI Model Connection Issue");
+        checkedParagraphs.current.delete(trimmed);
+      }
     }
   }, []);
 
@@ -229,9 +249,11 @@ export function ManuscriptEditor({
     }
   }, [checkOneParagraph]);
 
-  const scheduleParagraphCheck = useCallback(() => {
-    if (liveTimer.current) clearTimeout(liveTimer.current);
-    liveTimer.current = setTimeout(runParagraphCheck, LIVE_CHECK_DELAY);
+  useEffect(() => {
+    scheduleCheckRef.current = () => {
+      if (liveTimer.current) clearTimeout(liveTimer.current);
+      liveTimer.current = setTimeout(runParagraphCheck, LIVE_CHECK_DELAY);
+    };
   }, [runParagraphCheck]);
 
   const editor = useEditor({
@@ -521,43 +543,43 @@ export function ManuscriptEditor({
         </div>
       </div>
 
-      {/* Refined Canon Comparison Tooltip Card */}
+      {/* 100% Intensity Canon Comparison Tooltip Card */}
       {tooltip && tooltipContradiction && (
         <div
-          style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH + 32 }}
-          className="animate-fade-in pointer-events-none absolute z-30 rounded-2xl border border-flag-red/30 bg-paper-raised p-4 shadow-2xl shadow-black/15 glass-panel"
+          style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH + 40 }}
+          className="animate-fade-in pointer-events-none absolute z-50 rounded-2xl border-2 border-flag-red bg-paper-raised p-4 shadow-2xl shadow-flag-red/25 opacity-100 ring-4 ring-flag-red/10"
         >
-          <div className="flex items-center justify-between border-b border-border-soft pb-2">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-flag-red animate-pulse" />
-              <p className="text-xs font-bold text-flag-red">
+          <div className="flex items-center justify-between border-b border-border-soft pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-flag-red animate-pulse ring-2 ring-flag-red/30" />
+              <p className="text-xs font-extrabold text-flag-red tracking-wide uppercase">
                 {tooltipContradiction.entity} Conflict
               </p>
             </div>
-            <span className="rounded bg-paper-sunken px-1.5 py-0.5 text-[10px] font-mono text-ink-faint">
+            <span className="rounded-md bg-flag-red/10 px-2 py-0.5 text-[11px] font-mono font-bold text-flag-red border border-flag-red/20">
               Ch. {(tooltipContradiction.chapterIndex ?? 0) + 1}
             </span>
           </div>
 
-          <div className="mt-3 space-y-2 text-xs">
+          <div className="mt-3 space-y-2.5 text-xs">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Established Canon</span>
-              <p className="mt-0.5 font-serif italic text-ink-soft bg-gold-soft/50 p-2 rounded-lg border border-gold/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-soft">Established Canon</span>
+              <p className="mt-1 font-serif italic text-ink font-semibold bg-gold-soft p-2.5 rounded-xl border border-gold/40 shadow-sm leading-relaxed">
                 &ldquo;{tooltipContradiction.oldFact.excerpt}&rdquo;
               </p>
             </div>
 
             {tooltipContradiction.reason && (
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Reasoning</span>
-                <p className="mt-0.5 text-ink-soft leading-relaxed">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ink-soft">Reasoning</span>
+                <p className="mt-1 text-ink font-medium leading-relaxed bg-paper-sunken p-2.5 rounded-xl border border-border-soft">
                   {tooltipContradiction.reason}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="mt-3 border-t border-border-soft pt-2 text-[10px] font-semibold text-gold-strong text-center">
+          <div className="mt-3.5 border-t border-border-soft pt-2.5 text-xs font-bold text-flag-red text-center bg-flag-red/5 -mx-4 -mb-4 p-2.5 rounded-b-2xl">
             {tooltipContradiction.status === "unresolved"
               ? "Click inline highlight to open Continuity panel"
               : tooltipContradiction.status === "kept-old"

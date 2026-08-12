@@ -15,9 +15,12 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "ThreadLink — continuity for your manuscript",
+  title: "ThreadLink: Continuity for your manuscript",
   description:
     "A local, privacy-first writing tool that catches continuity errors in fiction.",
+  icons: {
+    icon: "/logo4.svg",
+  },
 };
 
 export default function RootLayout({

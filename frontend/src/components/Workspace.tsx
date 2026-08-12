@@ -66,6 +66,7 @@ export function Workspace() {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "offline">(
     "saved",
   );
+  const [aiError, setAiError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkPhase, setCheckPhase] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -558,6 +559,7 @@ export function Workspace() {
         onDeleteBook={handleDeleteBook}
         chapterTitle={activeChapter.title}
         saveState={saveState}
+        aiError={aiError}
         unresolvedCount={unresolvedCount}
         onCheckContinuity={handleCheckContinuity}
         checking={checking}
@@ -588,6 +590,7 @@ export function Workspace() {
             onContentChange={handleContentChange}
             onContradictionsDetected={handleContradictionsDetected}
             onCanonChanged={bumpCanon}
+            onErrorState={setAiError}
             onRename={handleRenameChapter}
             prevChapter={prevChapter}
             nextChapter={nextChapter}

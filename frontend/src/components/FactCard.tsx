@@ -95,14 +95,14 @@ export function FactCard({
           {status === "unresolved"
             ? "Action Required"
             : status === "kept-old"
-              ? "Kept Canon"
+              ? "Kept Thread"
               : "Superseded"}
         </span>
       </div>
 
       <div className="mt-3 space-y-2">
         <FactRow
-          label={fromProse ? "Supermemory Canon" : "Established Canon"}
+          label={fromProse ? "Supermemory Thread" : "Established Thread"}
           chapterTitle={oldFact.chapterTitle}
           excerpt={oldFact.excerpt}
           tone="old"
@@ -139,7 +139,7 @@ export function FactCard({
               onClick={() => onResolve(id, "kept-old")}
               className="flex-1 cursor-pointer rounded-lg border border-border bg-paper-raised px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition-all hover:border-gold hover:text-ink"
             >
-              {fromProse ? "Dismiss Conflict" : "Keep Established Canon"}
+              {fromProse ? "Dismiss Conflict" : "Keep Established Thread"}
             </button>
             {!fromProse && (
               <button
@@ -147,7 +147,7 @@ export function FactCard({
                 onClick={() => onResolve(id, "kept-new")}
                 className="flex-1 cursor-pointer rounded-lg bg-ink px-2.5 py-1.5 text-xs font-semibold text-paper shadow transition-all hover:bg-gold-strong hover:shadow-md"
               >
-                Supersede Canon
+                Supersede Thread
               </button>
             )}
           </div>

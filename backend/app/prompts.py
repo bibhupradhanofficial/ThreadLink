@@ -14,51 +14,47 @@ Return a JSON object with exactly two arrays: "facts" and "claims".
 
 FACTS = durable, canonical story facts worth remembering as canon. Each is one
 self-contained sentence. Store these:
-  - physical appearance (eye/hair color, scars, height)
-  - RANK, ROLE, TITLE, JOB, or AUTHORITY ("Voss is a sergeant", "Mara is queen") — ALWAYS a fact, never a claim
-  - relationships and allegiances
+  - physical appearance & traits (eye/hair color, facial hair, scars, height, species, age)
+  - RANK, ROLE, TITLE, JOB, or AUTHORITY ("Voss is a sergeant", "Mara is queen")
+  - relationships, kinship, and allegiances ("Elena is John's daughter")
   - world/history facts and dates ("the western wall was sealed 300 years ago")
-  - object states and possessions ("the sword is shattered")
-  - DURABLE STATE CHANGES — injuries, deaths, things breaking. Store the RESULTING
-    state ("Elara lost her legs and cannot walk", "the king is dead").
+  - object states and possessions ("Reyes has the silver key", "the sword is shattered")
+  - physical locations ("Captain Reyes is at the north gate")
+  - DURABLE STATE CHANGES — injuries, deaths, limbs lost, things breaking. Store the RESULTING
+    state ("Reyes lost both his legs at Varek Ridge and cannot walk", "the king is dead").
 Each fact: {"entity","attribute","statement","excerpt"}.
 
-CLAIMS = transient assertions that PRESUPPOSE a state or capability. Never stored,
-only checked against canon. Emit a claim ONLY where the presupposed state is
-something canon might track: body/capability, possession, alive/dead, physical
-location constraints, or role/authority being exercised.
+CLAIMS = assertions or actions that presuppose a state, capability, or location canon might track.
+Never stored in memory, only checked against established canon.
+Emit a claim whenever an action or statement presupposes:
+  - locomotion & movement (running, sprinting, walking, climbing, standing)
+  - physical capability (using legs, using hands/arms, seeing, hearing, speaking)
+  - possession or item usage (drawing a sword, wearing an item, using a key)
+  - physical location presence
+  - role authority or title
+  - facial hair or physical attribute presupposition ("shaved her beard" -> presupposes having a beard)
 Each claim: {"entity","presupposedState","excerpt"}.
 
 RULES:
-- One sentence per item. Resolve pronouns to entity names.
+- One sentence per item. Resolve pronouns to entity names using context.
 - "excerpt" MUST be a verbatim substring copied from the paragraph.
-- Durability is the filter, NOT quantity. A plain sentence yields 0-5 facts; a dense
-  introduction or info-dump can legitimately yield 15-20 — emit them all.
-- Do NOT emit trivia as facts (transient weather, dust, a single gesture) unless it
-  is a durable state. Do NOT emit a claim for every verb — only tracked states.
-- Do NOT emit a CLAIM for incidental hand, arm, head, or speech actions (raising a
-  cup, gripping, nodding, speaking, reading). These presuppose capabilities canon
-  does not track and cause false contradictions against unrelated states like lost
-  legs. Emit claims only for LOCOMOTION (walking, running, climbing, vaulting) and
-  actions that clearly require a capability canon actually tracks.
-- If the same entity+attribute appears twice, keep the more specific one.
+- Durability is the filter for facts, NOT quantity. Emit all valid facts and claims present.
+- Do NOT emit trivia as facts (transient weather, dust).
+- If the same entity+attribute appears twice, keep the more specific statement.
 
 EXAMPLES:
+
+Paragraph: "Captain Reyes sprinted across the courtyard toward the north gate."
+-> {"facts":[{"entity":"Reyes","attribute":"location","statement":"Captain Reyes is at the courtyard near the north gate.","excerpt":"sprinted across the courtyard"}],"claims":[{"entity":"Reyes","presupposedState":"Reyes can run and walk (has functioning legs)","excerpt":"sprinted across the courtyard"}]}
 
 Paragraph: "Behind her, Sergeant Voss cursed the heat. He was young for a sergeant, but he wore the rank like it had been stitched to his skin."
 -> {"facts":[{"entity":"Voss","attribute":"rank","statement":"Voss holds the rank of sergeant.","excerpt":"Sergeant Voss"},{"entity":"Voss","attribute":"age","statement":"Voss is young for a sergeant.","excerpt":"young for a sergeant"}],"claims":[]}
 
-Paragraph: "Elara lost both her legs in the mill accident that spring."
--> {"facts":[{"entity":"Elara","attribute":"legs","statement":"Elara lost both her legs in a mill accident and cannot walk.","excerpt":"lost both her legs in the mill accident"}],"claims":[]}
-
-Paragraph: "Elara walked across the room and poured herself a drink."
--> {"facts":[],"claims":[{"entity":"Elara","presupposedState":"Elara can walk","excerpt":"walked across the room"}]}
+Paragraph: "Reyes lost both his legs at Varek Ridge."
+-> {"facts":[{"entity":"Reyes","attribute":"limbs","statement":"Reyes lost both his legs at Varek Ridge and cannot walk or run.","excerpt":"lost both his legs at Varek Ridge"}],"claims":[]}
 
 Paragraph: "Elena shaved her beard and combed her brown hair."
--> {"facts":[{"entity":"Elena","attribute":"hair color","statement":"Elena has brown hair.","excerpt":"her brown hair"}],"claims":[{"entity":"Elena","presupposedState":"Elena has a beard (facial hair)","excerpt":"shaved her beard"}]}
-
-Paragraph: "Elias raised a cup to his brother and laughed."
--> {"facts":[],"claims":[]}
+-> {"facts":[{"entity":"Elena","attribute":"hair color","statement":"Elena has brown hair.","excerpt":"her brown hair"}],"claims":[{"entity":"Elena","presupposedState":"Elena has facial hair (a beard)","excerpt":"shaved her beard"}]}
 
 Return ONLY the JSON object, no prose."""
 
@@ -85,59 +81,27 @@ def build_extract_messages(paragraph: str, preceding_context: str | None = None)
 
 JUDGE_SYSTEM = """You are a continuity checker for a fiction manuscript. You are given a
 JSON array of ITEMS. Each item is either a new FACT or a transient CLAIM the author
-just wrote, paired with CANON memories already established in EARLIER chapters.
+just wrote, paired with CANON memories already established in earlier prose.
 
 For each item, decide its verdict against its canon:
   - "duplicate"     : canon already states essentially this same fact. (facts only)
   - "consistent"    : compatible with canon; it extends or refines canon.
   - "contradiction" : it conflicts with canon.
 
-CONTRADICTION INCLUDES ENTAILMENT VIOLATIONS, not just direct opposites. If canon
-makes the item IMPOSSIBLE, that is a contradiction even if no single canon sentence
-is the literal negation. Example — canon: "Elara lost her legs in the mill accident"
-contradicts claim "Elara walked across the room", because losing her legs entails she
-cannot walk. Judge state-vs-state, not word-vs-word.
+CONTRADICTION INCLUDES ENTAILMENT VIOLATIONS, not just direct opposites:
+  - Physical capability: If canon states an entity lost legs, is dead, is blind, or is mute, any claim/fact where they run, sprint, walk, see, or speak is a CONTRADICTION.
+  - Eye/Hair/Physical trait: Canon "grey eyes" vs new "green eyes" is a CONTRADICTION.
+  - Location: Canon "Reyes is locked in the dungeon in Chapter 1" vs new "Reyes is walking in the garden" without travel is a CONTRADICTION.
+  - Counting & totals: Canon "had 3 sons but 1 died" vs new "all 3 sons greeted her" is a CONTRADICTION.
+  - Commonsense defaults: A young human girl having a beard to shave is a CONTRADICTION unless world rules state otherwise.
 
-COUNTING RULE: deaths and losses change totals. If canon says one of N children,
-members, or items died / was lost / was destroyed, then later text where all N are
-alive, present, or intact is a contradiction. Example — canon: "Zelda had three sons
-but one died in an accident" contradicts "her three sons came to hug her": only two
-sons remain, so all three cannot be present.
+TEMPORAL STATE CHANGES (supersession vs reversion):
+Attributes like rank, role, title, location, or allegiance change over time.
+  - A new state progressing forward (e.g. sergeant -> captain in a later chapter) is "consistent".
+  - A reversion to an older value that conflicts with a later established chapter is a "contradiction".
+  - IMMUTABLE attributes (birthplace, eye color, permanent injuries, deaths) NEVER get supersession; any change is a CONTRADICTION.
 
-COMMONSENSE DEFAULTS: the category canon assigns an entity carries strong real-world
-defaults, and violating one is a contradiction — a "young girl" does not have a beard
-to shave, a horse does not speak, a newborn does not stride across a room. Example —
-canon: "Elena was a beautiful young girl" contradicts claim "Elena has a beard".
-EXCEPTION: if any canon memory establishes the exception for this world or entity
-(a bearded folk, talking animals, a curse), it is NOT a contradiction — the story's
-own rules always outrank real-world defaults. Cite the category-establishing memory
-as conflictingMemoryId.
-
-TEMPORAL STATE CHANGES (supersession vs reversion): Some attributes legitimately
-change as the story advances — rank, role, title, job, coat/insignia, location,
-allegiance, marital status, possessions. Each canon memory carries its chapter in metadata;
-the CURRENT canonical value is the one from the HIGHEST chapter. The item being
-judged was just written, so treat it as the most recent.
-  - If the new value is a plausible new state that differs from the current value,
-    it is "consistent" — a legitimate progression that supersedes the older value
-    (kept as history, not a contradiction). Canon "Voss is a sergeant" (ch2), new
-    "Voss is a captain" (ch5) -> consistent (a promotion).
-  - If the new value reverts to an older, already-superseded value and thereby
-    conflicts with the value established in a LATER chapter, it is a
-    "contradiction". Set conflictingMemoryId to that later memory. Canon "Voss is a
-    captain" (ch5), new "Voss is a sergeant" (ch8) -> contradiction against ch5.
-This applies ONLY to the mutable attributes above. IMMUTABLE attributes — given
-name, eye/hair color, species, birthplace, permanent injuries, deaths — never get
-supersession: any change is a contradiction. Age is mutable but MONOTONIC: it may
-increase across chapters, never decrease (a lower age later is a contradiction).
-
-For a CLAIM, "contradiction" means canon makes the presupposed state false/impossible.
-A claim contradicts canon only if the SPECIFIC capability it presupposes is the one
-canon negates. Match the body system precisely: "can lift a cup" (arms) does NOT
-conflict with "lost both legs" (locomotion). Claims are never "duplicate".
-
-When verdict is "contradiction", set "conflictingMemoryId" to the id of the specific
-canon memory it conflicts with.
+When verdict is "contradiction", set "conflictingMemoryId" to the id of the specific canon memory it conflicts with.
 
 Return JSON: {"verdicts":[{"itemIndex":<int>,"verdict":"...","conflictingMemoryId":<id or null>,"reason":"<short>"}]}
 One verdict per input item, matched by itemIndex. Return ONLY the JSON object."""

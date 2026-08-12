@@ -156,7 +156,7 @@ export function CanonGraph({
             </p>
           ) : !data ? (
             <p className="mt-24 animate-pulse text-center text-[13px] text-ink-faint">
-              Mapping relationships from canon…
+              Mapping relationships from thread…
             </p>
           ) : data.edges.length === 0 ? (
             <div className="mt-24 px-10 text-center">
@@ -165,7 +165,7 @@ export function CanonGraph({
               </p>
               <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
                 Write scenes that connect your characters — marriages, feuds,
-                jobs, kinships — and the graph will draw itself from canon.
+                jobs, kinships — and the graph will draw itself from thread.
               </p>
             </div>
           ) : (
