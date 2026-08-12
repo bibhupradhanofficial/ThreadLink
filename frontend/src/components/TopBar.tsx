@@ -227,7 +227,7 @@ export function TopBar({
             title="Back to landing page"
             className="rounded-md text-sm font-semibold tracking-tight text-ink transition-colors hover:text-ink-soft"
           >
-            StoryCanon
+            ThreadLink
           </Link>
           <span className="px-0.5 text-ink-faint">/</span>
           <BookSwitcher

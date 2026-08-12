@@ -294,6 +294,13 @@ async def continuity_check(book_id: str) -> list[PendingContradiction]:
     return out
 
 
+import logging
+import json
+
+pipeline_logger = logging.getLogger("continuity.pipeline")
+_graph_cache: dict[str, tuple[str, GraphResponse]] = {}
+
+
 async def build_graph(book_id: str) -> GraphResponse:
     """Canon facts → labeled relationship edges between named entities (one LLM
     call), normalized for the frontend graph: node ids are lowercased names."""
@@ -306,7 +313,22 @@ async def build_graph(book_id: str) -> GraphResponse:
         facts.append(
             {"entity": str(md.get("entity") or ""), "statement": str(e.get("memory") or "")}
         )
-    result = await extract_graph(facts[:200])
+
+    facts_subset = facts[:200]
+    facts_str = json.dumps(facts_subset, sort_keys=True)
+    facts_hash = hashlib.md5(facts_str.encode()).hexdigest()
+
+    cached = _graph_cache.get(book_id)
+    if cached and cached[0] == facts_hash:
+        return cached[1]
+
+    try:
+        result = await extract_graph(facts_subset)
+    except Exception as err:
+        if cached:
+            pipeline_logger.warning("Graph extraction failed (%s), returning cached graph", err)
+            return cached[1]
+        raise
 
     nodes: dict[str, str] = {}
     edges: list[GraphEdge] = []
@@ -322,9 +344,12 @@ async def build_graph(book_id: str) -> GraphResponse:
         nodes.setdefault(s.lower(), s)
         nodes.setdefault(t.lower(), t)
         edges.append(GraphEdge(source=s.lower(), relation=r, target=t.lower()))
-    return GraphResponse(
+    
+    graph_resp = GraphResponse(
         nodes=[GraphNode(id=k, label=v) for k, v in nodes.items()], edges=edges
     )
+    _graph_cache[book_id] = (facts_hash, graph_resp)
+    return graph_resp
 
 
 _P_RE = re.compile(r"<p[^>]*>(.*?)</p>", re.DOTALL | re.IGNORECASE)

@@ -125,7 +125,7 @@ export function ContinuityPanel({
             </p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
               {checked
-                ? "This manuscript agrees with everything StoryCanon has on record."
+                ? "This manuscript agrees with everything ThreadLink has on record."
                 : "Run a check to compare this manuscript against established canon."}
             </p>
           </div>
@@ -165,7 +165,7 @@ export function ContinuityPanel({
 
       <div className="border-t border-border-soft px-5 py-3">
         <p className="text-[11px] leading-relaxed text-ink-faint">
-          StoryCanon never overwrites a fact on its own — every contradiction
+          ThreadLink never overwrites a fact on its own — every contradiction
           waits for your decision.
         </p>
       </div>

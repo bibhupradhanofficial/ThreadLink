@@ -1,11 +1,11 @@
-# StoryCanon
+# ThreadLink
 
-**A manuscript editor that catches continuity errors while you write — and remembers your whole story, locally, on Supermemory.**
+**A manuscript editor that catches continuity errors while you write — and remembers your whole story on Supermemory Cloud.**
 
-![StoryCanon — write the story, it remembers the canon](assets/readme.png)
+ThreadLink — write the story, it remembers the canon
 
-> Built for the **Supermemory Local Hackathon**. Everything — memory, embeddings,
-> search, extraction — runs on your machine. No account, no cloud store.
+> Built with **Supermemory Cloud**. Everything — memory, embeddings,
+> search, extraction — is managed via Supermemory Cloud API.
 
 ---
 
@@ -18,7 +18,7 @@ to Lieutenant is back in a private's coat. A daughter's name changes halfway
 through. Nobody catches these until a copyeditor does, six months and one contract
 later.
 
-StoryCanon reads every chapter into a memory of your story's **canon**, then flags
+ThreadLink reads every chapter into a memory of your story's **canon**, then flags
 the moment new prose contradicts it — inline, as you type, pointing at the exact
 earlier line.
 
@@ -35,13 +35,13 @@ reasoning is the product; the memory it reasons over is Supermemory.
 
 ---
 
-## How it uses Supermemory Local (and why a vector DB wouldn't do)
+## How it uses Supermemory Cloud (and why a vector DB wouldn't do)
 
 Most memory demos are "ingest documents, embed, retrieve nearest chunks." That's a
-vector database. StoryCanon leans on the parts of Supermemory a plain vector store
+vector database. ThreadLink leans on the parts of Supermemory a plain vector store
 **doesn't have**:
 
-| Supermemory capability | How StoryCanon uses it | Why a vector DB can't |
+| Supermemory capability | How ThreadLink uses it | Why a vector DB can't |
 |---|---|---|
 | **Container tags** | One tag per book (`book_{id}`) isolates each manuscript's canon. | Namespacing exists, but it's the least of it. |
 | **Numeric metadata filters** | Every fact carries its `chapterIndex`; retrieval filters `chapterIndex < current`, so chapter 4 is only ever judged against chapters 1–3. **"Earlier chapters are canon" is enforced by the query, not hoped for in a prompt.** | Returns nearest chunks regardless of when they were written. No temporal ordering. |
@@ -58,7 +58,7 @@ possible.
 
 ### Two readings of the same manuscript
 
-StoryCanon extracts canon two independent ways and plays them against each other:
+ThreadLink extracts canon two independent ways and plays them against each other:
 
 - **Curated** (`book_{id}`) — our LLM extracts structured facts with a verbatim
   excerpt (what the red highlight anchors to) and an entity/attribute (what the
@@ -76,7 +76,7 @@ to underline; Supermemory's actually knows who everyone is.
 
 ## Architecture
 
-![StoryCanon architecture](assets/architecture.png)
+ThreadLink architecture
 
 **The live loop** (per paragraph, as you type): extract facts + claims → search
 canon filtered to earlier chapters → judge each against its canon → store new facts
@@ -84,46 +84,47 @@ or version-bump changed ones → flag contradictions inline. Worst case is exact
 **two LLM calls** per paragraph (extract + one batched judge), regardless of how
 many facts it contains.
 
-**Why prose lives in `library.json`:** Supermemory documents are write-once on the
-local server (re-adding a `customId` doesn't replace content), so editable
-manuscript text is kept in a local JSON file; Supermemory stays the canon/derived
+**Why prose lives in `library.json`:** Supermemory Cloud documents are write-once on the
+API server (re-adding a `customId` doesn't replace content), so editable
+manuscript text is kept in a local JSON file; Supermemory Cloud stays the canon/derived
 memory store. A re-sync deletes and re-adds the document so derived memories track
 edits.
 
 ### Stack
 
 - **Frontend** — Next.js (App Router) · TypeScript · Tailwind v4 · TipTap
-- **Backend** — Python · FastAPI · LiteLLM (extraction + judging, e.g. `gpt-4o`)
-- **Memory** — Supermemory Local (self-hosted Bun binary) · local `bge-base-en-v1.5`
-  embeddings · `gpt-4o-mini` for its own prose extraction
+- **Backend** — Python · FastAPI · LiteLLM (extraction + judging, e.g. `gemini/gemini-3.6-flash`, `groq/llama-3.3-70b-versatile`, or `openai/gpt-4o`)
+- **Memory** — Supermemory Cloud API (`https://api.supermemory.ai`)
 
 ---
 
 ## Quick start
 
-**Prerequisites:** Docker + Docker Compose, and one OpenAI-compatible API key
-(or local Ollama).
+**Prerequisites:** Node.js, Python 3.11+, Supermemory Cloud API key (from [supermemory.ai](https://supermemory.ai)), and an LLM API key (Gemini, Groq, or OpenAI).
 
 ```bash
-git clone <your-repo-url> storycanon
-cd storycanon
+git clone <your-repo-url> threadlink
+cd threadlink
 
-# 1. Configure the two provider keys (both git-ignored)
-cp .env.example .env                  # Supermemory's own prose extraction
-cp backend/.env.example backend/.env  # our extraction + judging pipeline
-#   → put your OpenAI key in both (or point them at Ollama)
+# 1. Configure backend environment
+cp backend/.env.example backend/.env
+# Set SUPERMEMORY_API_KEY=sm_... and your LLM key (e.g. GEMINI_API_KEY or GROQ_API_KEY) in backend/.env
 
-# 2. Bring up all three services
-docker compose up -d --build
+# 2. Run backend
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+
+# 3. Run frontend (in another terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
 - **Editor** → http://localhost:3000
 - **API** → http://localhost:8000/health
-- **Supermemory** → http://localhost:6767
+- **Supermemory Cloud** → https://api.supermemory.ai
 
-The Supermemory API key is **auto-discovered** — the backend reads it from the
-shared data volume on first boot, so there's no key to copy by hand. Give
-Supermemory ~60s on first run to unpack its embedding model.
 
 **Try it:** open the editor, paste a few chapters, and hit **Check Continuity**.
 Canon builds as it reads; contradictions light up red. Write a character a
@@ -140,10 +141,9 @@ providers:
 | File | Powers | Key variables |
 |---|---|---|
 | `.env` (root) | Supermemory's extraction of memories from prose | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` |
-| `backend/.env` | Our fact extraction + contradiction judging | `EXTRACTOR_MODEL`, provider key (e.g. `OPENAI_API_KEY`), optional `EXTRACTOR_API_BASE` |
+| `backend/.env` | Our fact extraction + contradiction judging | `EXTRACTOR_MODEL`, provider key (e.g. `GEMINI_API_KEY`), optional `EXTRACTOR_API_BASE` |
 
-`EXTRACTOR_MODEL` is any LiteLLM string — `openai/gpt-4o`, `groq/llama-3.3-70b-versatile`,
-`ollama/gemma3:4b`, etc. See each `*.env.example` for the full set.
+`EXTRACTOR_MODEL` is any LiteLLM string — `gemini/gemini-3.6-flash`, `groq/llama-3.3-70b-versatile`, `openai/gpt-4o`, etc. See each `*.env.example` for the full set.
 
 ---
 
@@ -185,11 +185,11 @@ providers:
 
 ## Known limitations
 
-Honest, and mostly upstream. While building we hit four bugs in Supermemory Local
+Honest, and mostly upstream. While building we hit four bugs in Supermemory Cloud API
 itself — a native segfault under concurrent embedding load, a Workers-only
 reranker that throws when self-hosted, a silent list-pagination default (10), and
 forgotten memories that can't be read back — each reported separately with repro
-and evidence. StoryCanon works around them (bounded concurrency, no rerank,
+and evidence. ThreadLink works around them (bounded concurrency, no rerank,
 explicit pagination, hard-delete semantics for forget).
 
 Product-side: extraction is non-deterministic, so a given run may miss one of the
@@ -203,5 +203,5 @@ exactly one daughter.
 
 ## Credits
 
-Built on [Supermemory Local](https://supermemory.ai). Continuity reasoning, the
-two-reading retrieval model, and the editor are StoryCanon's own.
+Built on [Supermemory Cloud](https://supermemory.ai). Continuity reasoning, the
+two-reading retrieval model, and the editor are ThreadLink's own.

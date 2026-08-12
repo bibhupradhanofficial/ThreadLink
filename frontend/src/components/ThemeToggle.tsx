@@ -48,7 +48,7 @@ export function ThemeToggle() {
     const next = currentTheme() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     try {
-      window.localStorage.setItem("storycanon-theme", next);
+      window.localStorage.setItem("threadlink-theme", next);
     } catch {
       // Theme still applies for this visit even if storage is unavailable.
     }

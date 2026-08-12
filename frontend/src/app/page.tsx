@@ -7,12 +7,12 @@ const FEATURES = [
     body: "Every paragraph is distilled into canonical facts. Give a character grey eyes in chapter three when chapter one said green, and the line is flagged before your editor ever sees it.",
   },
   {
-    title: "Canon that remembers its past",
+    title: "Thread that remembers its past",
     body: "Decisions version your story's memory instead of overwriting it — green eyes is superseded, not erased. The Story Bible keeps every fact, every chapter it came from, and its full history.",
   },
   {
     title: "A map of who's who",
-    body: "Marriages, feuds, workplaces, kinships — StoryCanon draws the relationship graph straight from the facts your chapters establish. No tagging, no upkeep.",
+    body: "Marriages, feuds, workplaces, kinships — ThreadLink draws the relationship graph straight from the facts your chapters establish. No tagging, no upkeep.",
   },
 ];
 
@@ -21,7 +21,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col">
       <header className="flex h-14 items-center justify-between px-6 sm:px-10">
         <span className="text-sm font-semibold tracking-tight text-ink">
-          StoryCanon
+          ThreadLink
         </span>
         <Link
           href="/editor"
@@ -47,10 +47,10 @@ export default function Home() {
         <h1 className="mt-4 max-w-2xl font-serif text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
           Write the story.
           <br />
-          It remembers the canon.
+          It remembers the thread.
         </h1>
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-          StoryCanon is a manuscript editor with a memory. It learns every fact
+          ThreadLink is a manuscript editor with a memory. It learns every fact
           your chapters establish, warns you the moment new prose contradicts
           them, and keeps a living Story Bible — all running locally on
           Supermemory.

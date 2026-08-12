@@ -1,6 +1,7 @@
 """LiteLLM glue: two schema-constrained completions (extract, judge) with a
 parse-and-retry fallback so we never trust that the structured-output path exists.
 """
+import asyncio
 import json
 import logging
 import re
@@ -21,9 +22,6 @@ T = TypeVar("T", bound=BaseModel)
 # LiteLLM is chatty on import; keep our logs clean.
 litellm.suppress_debug_info = True
 
-# LiteLLM retries these internally with exponential backoff, honouring the
-# provider's Retry-After. Covers the brief per-minute limits; a exhausted daily
-# quota survives all retries and surfaces as LLMRateLimited.
 _NUM_RETRIES = 2
 
 
@@ -77,20 +75,61 @@ async def _complete_json(messages: list[dict], schema: Type[T]) -> T:
 
 
 async def _raw_completion(kwargs: dict) -> str:
-    try:
-        resp = await litellm.acompletion(**kwargs, num_retries=_NUM_RETRIES)
-    except RateLimitError as err:
-        retry_after = _parse_retry_after(err)
-        logger.warning(
-            "%s rate limited after %d retries (retry_after=%s)",
-            kwargs.get("model"), _NUM_RETRIES, retry_after,
-        )
-        raise LLMRateLimited(
-            f"{kwargs.get('model')} is rate limited or out of quota. "
-            "Wait for the limit to reset, or switch EXTRACTOR_MODEL.",
-            retry_after,
-        ) from err
-    return resp.choices[0].message.content or ""
+    max_attempts = 3
+    last_err: Exception | None = None
+    
+    for attempt in range(max_attempts):
+        try:
+            resp = await litellm.acompletion(**kwargs, num_retries=_NUM_RETRIES)
+            return resp.choices[0].message.content or ""
+        except RateLimitError as err:
+            last_err = err
+            retry_after = _parse_retry_after(err)
+            
+            # If retry_after is short (<= 15 seconds) and we have attempts left, sleep and retry
+            if retry_after is not None and retry_after <= 15 and attempt < max_attempts - 1:
+                logger.warning(
+                    "%s rate limited (retry_after=%.1fs). Waiting before retry %d/%d...",
+                    kwargs.get("model"), retry_after, attempt + 1, max_attempts - 1
+                )
+                await asyncio.sleep(retry_after + 0.5)
+                continue
+
+            # Automatic model fallbacks if primary model rate-limits
+            current_model = kwargs.get("model", "")
+            fallback_model = None
+            if "gemini-3.6-flash" in current_model and attempt == 0:
+                fallback_model = "gemini/gemini-flash-latest"
+            elif "groq/llama-3.3-70b-versatile" in current_model and attempt == 0:
+                fallback_model = "groq/llama-3.1-8b-instant"
+
+            if fallback_model:
+                logger.warning(
+                    "Rate limit on %s. Attempting fallback to %s...",
+                    current_model, fallback_model
+                )
+                try:
+                    fallback_kwargs = {**kwargs, "model": fallback_model}
+                    resp = await litellm.acompletion(**fallback_kwargs, num_retries=1)
+                    return resp.choices[0].message.content or ""
+                except Exception as fb_err:
+                    logger.warning("Fallback model %s failed: %s", fallback_model, fb_err)
+
+            logger.warning(
+                "%s rate limited after retries (retry_after=%s)",
+                kwargs.get("model"), retry_after,
+            )
+            raise LLMRateLimited(
+                f"{kwargs.get('model')} rate limit reached. "
+                "Please wait for reset or check your API key quota in backend/.env.",
+                retry_after,
+            ) from err
+
+    # Fallback error raise if retries exhausted
+    raise LLMRateLimited(
+        f"{kwargs.get('model')} rate limit reached after retries.",
+        _parse_retry_after(last_err) if last_err else None,
+    )
 
 
 def _strip_fences(text: str) -> str:

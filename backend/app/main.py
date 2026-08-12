@@ -33,6 +33,8 @@ from .models import (
     ResolveResponse,
 )
 
+from supermemory import APIConnectionError
+
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Continuity Editor API")
@@ -45,8 +47,24 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(APIConnectionError)
+async def supermemory_connection_error_handler(_: Request, exc: APIConnectionError) -> JSONResponse:
+    """Supermemory Cloud API is unreachable or request failed — surface a 503."""
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "Cannot connect to Supermemory Cloud API at https://api.supermemory.ai. "
+                "Please check your internet connection and verify SUPERMEMORY_API_KEY in backend/.env."
+            )
+        },
+    )
+
+
+
 @app.exception_handler(LLMRateLimited)
 async def llm_rate_limited_handler(_: Request, exc: LLMRateLimited) -> JSONResponse:
+
     """Provider quota exhaustion is expected on free tiers — surface it as a 429
     the frontend can show, not an opaque 500."""
     headers = {}
