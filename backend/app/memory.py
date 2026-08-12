@@ -36,7 +36,57 @@ async def search_facts(
     threshold: float = 0.4,
     limit: int = 8,
 ) -> list[dict]:
-    """Search canon. `chapter_index_lt` enforces 'earlier chapters are canon'."""
+    """Search curated canon. `chapter_index_lt` enforces 'earlier chapters are canon'."""
+    return await _search_container(
+        q,
+        book_tag(book_id),
+        "curated",
+        chapter_index_lt=chapter_index_lt,
+        threshold=threshold,
+        limit=limit,
+    )
+
+
+async def search_derived(
+    q: str,
+    book_id: str,
+    *,
+    chapter_index_lt: Optional[int] = None,
+    threshold: float = 0.4,
+    limit: int = 4,
+) -> list[dict]:
+    """Search what Supermemory derived from the prose — a second, independent
+    reading of the same manuscript.
+
+    Our extraction is structured but brittle: it names the same man `Elias`,
+    `Elias Reyes` and `Reyes`, and a fact it simply misses is canon we never had.
+    Supermemory's reading resolves references consistently and has higher recall,
+    so it covers exactly those gaps. Derived memories carry the same numeric
+    chapterIndex, so the 'earlier chapters are canon' filter applies identically.
+
+    Evidence, not canon: these carry no entity/attribute (so they are never
+    revision targets) and no verbatim excerpt, and they are deleted and re-derived
+    on every prose sync — so a contradiction against one can only be advisory.
+    """
+    return await _search_container(
+        q,
+        chapters_tag(book_id),
+        "derived",
+        chapter_index_lt=chapter_index_lt,
+        threshold=threshold,
+        limit=limit,
+    )
+
+
+async def _search_container(
+    q: str,
+    tag: str,
+    source: str,
+    *,
+    chapter_index_lt: Optional[int] = None,
+    threshold: float = 0.4,
+    limit: int = 8,
+) -> list[dict]:
     filters = None
     if chapter_index_lt is not None:
         filters = {
@@ -55,7 +105,7 @@ async def search_facts(
     # Re-add when the Story Bible / version-history UI lands.
     kwargs: dict[str, Any] = dict(
         q=q,
-        container_tag=book_tag(book_id),
+        container_tag=tag,
         search_mode="memories",
         threshold=threshold,
         limit=limit,
@@ -75,6 +125,9 @@ async def search_facts(
                 "metadata": r.metadata or {},
                 "similarity": getattr(r, "similarity", None),
                 "context": _context_to_dict(getattr(r, "context", None)),
+                # Which reading of the manuscript this came from. Drives whether a
+                # contradiction against it can be resolved or is advisory only.
+                "source": source,
             }
         )
     return out
@@ -134,27 +187,31 @@ async def forget(book_id: str, memory_id: str, reason: str) -> None:
 _LIST_PAGE_SIZE = 100
 
 
-async def list_memories(book_id: str) -> list[dict]:
-    """Story Bible source: every entry for the book, with update history."""
+async def _list_container(tag: str) -> list[dict]:
     out: list[dict] = []
     page = 1
     while True:
         resp = await client.post(
             "/v4/memories/list",
-            body={
-                "containerTags": [book_tag(book_id)],
-                "limit": _LIST_PAGE_SIZE,
-                "page": page,
-            },
+            body={"containerTags": [tag], "limit": _LIST_PAGE_SIZE, "page": page},
             cast_to=httpx.Response,
         )
         data = resp.json()
         out.extend(data.get("memoryEntries", []))
         pagination = data.get("pagination") or {}
-        total_pages = pagination.get("totalPages") or 1
-        if page >= total_pages:
+        if page >= (pagination.get("totalPages") or 1):
             return out
         page += 1
+
+
+async def list_memories(book_id: str) -> list[dict]:
+    """Story Bible source: every curated entry for the book, with history."""
+    return await _list_container(book_tag(book_id))
+
+
+async def list_derived(book_id: str) -> list[dict]:
+    """Memories Supermemory derived from the prose itself (see sync_chapter_prose)."""
+    return await _list_container(chapters_tag(book_id))
 
 
 # --- Book & chapter PROSE stored in a local JSON library ---------------------
@@ -226,6 +283,82 @@ async def save_chapter(
         }
         _write_library(data)
     return chapter_id
+
+
+async def sync_chapter_prose(
+    book_id: str, chapter_id: str, title: str, index: int, text: str
+) -> Optional[str]:
+    """Hand raw chapter prose to Supermemory and let IT derive the memories.
+
+    This is the memory layer doing the reading, not us: given the prose it
+    resolves references on its own ("His daughter Mira" -> "Mira, daughter of
+    Captain Elias Reyes"), which our own extraction fragments into `Elias`,
+    `Elias Reyes` and `Reyes`.
+
+    Kept in a SEPARATE container from curated canon (`book_x:chapters` vs
+    `book_x`) for two reasons: derived memories must never reach the
+    contradiction judge — they carry no entity/attribute/chapterIndex metadata,
+    so the numeric chapter filter can't order them — and the two extractions
+    would otherwise flag each other as duplicates forever.
+
+    Documents are write-once locally (re-adding a customId does not replace), so
+    a re-sync deletes the previous document first; the delete cascades to the
+    memories derived from it. Returns the new document id, or None for prose too
+    short to be worth a model call.
+    """
+    if len(text.split()) < 20:
+        return None
+
+    old_id = await _read_prose_doc_id(book_id, chapter_id)
+    if old_id:
+        try:
+            await client.delete(f"/v3/documents/{old_id}", cast_to=httpx.Response)
+        except Exception:
+            # Already gone (volume reset, manual delete) — the add below still
+            # has to happen, so a failed cleanup must not block it.
+            pass
+
+    resp = await client.post(
+        "/v3/documents",
+        body={
+            "content": text,
+            "containerTags": [chapters_tag(book_id)],
+            "metadata": {
+                "bookId": book_id,
+                "chapterId": chapter_id,
+                "chapterTitle": title,
+                "chapterIndex": index,
+            },
+        },
+        cast_to=httpx.Response,
+    )
+    doc_id = resp.json().get("id")
+    if doc_id:
+        await _write_prose_doc_id(book_id, chapter_id, str(doc_id))
+    return doc_id
+
+
+async def _read_prose_doc_id(book_id: str, chapter_id: str) -> Optional[str]:
+    async with _library_lock:
+        data = _read_library()
+    book = data["books"].get(book_id) or {}
+    ch = (book.get("chapters") or {}).get(chapter_id) or {}
+    return ch.get("proseDocId")
+
+
+async def _write_prose_doc_id(book_id: str, chapter_id: str, doc_id: str) -> None:
+    # Read-modify-write under the lock: save_chapter concurrently rewrites the
+    # same file, and an unlocked pass here would drop whichever landed second.
+    async with _library_lock:
+        data = _read_library()
+        book = data["books"].get(book_id)
+        if not book:
+            return
+        ch = (book.get("chapters") or {}).get(chapter_id)
+        if ch is None:
+            return
+        ch["proseDocId"] = doc_id
+        _write_library(data)
 
 
 async def save_contradictions(book_id: str, contradictions: list[dict]) -> None:
