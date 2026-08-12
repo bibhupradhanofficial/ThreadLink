@@ -78,6 +78,10 @@ class PendingContradiction(Contradiction):
     chapterIndex: Optional[int] = None
     # The judge's short explanation of the conflict — shown on hover in the editor.
     reason: Optional[str] = None
+    # Which paragraph produced this. A re-check of the same paragraph supersedes
+    # every earlier finding for it, so editing prose can clear a stale flag
+    # instead of stacking a second one beside it.
+    paragraphIndex: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -92,11 +96,18 @@ class ParagraphCheckRequest(BaseModel):
     paragraphText: str
     # Immediately preceding text — used only to resolve pronouns/entities.
     precedingContext: Optional[str] = None
+    # Position of this paragraph in the chapter; scopes supersession (see
+    # PendingContradiction.paragraphIndex).
+    paragraphIndex: Optional[int] = None
 
 
 class ParagraphCheckResponse(BaseModel):
     facts: list[Fact] = Field(default_factory=list)  # facts stored this call
     contradictions: list[PendingContradiction] = Field(default_factory=list)
+    # Echoed back so the client knows which paragraph's findings this response
+    # replaces — an empty `contradictions` means "this paragraph is clean now",
+    # which is indistinguishable from "no news" without it.
+    paragraphIndex: Optional[int] = None
 
 
 class ResolveRequest(BaseModel):
@@ -164,6 +175,26 @@ class CanonVersion(BaseModel):
     updatedAt: Optional[str] = None
 
 
+class MemoryMeta(BaseModel):
+    """Supermemory's own bookkeeping, passed through verbatim.
+
+    The Story Bible is a view of the memory layer, not a panel we drew beside
+    it — surfacing these lets an author (or a judge) audit exactly what
+    Supermemory is holding and why.
+    """
+
+    memoryId: str
+    containerTag: str
+    version: Optional[int] = None
+    isLatest: Optional[bool] = None
+    # Every version of a fact shares the root id — this is what makes the
+    # version chain a chain rather than unrelated rows.
+    rootMemoryId: Optional[str] = None
+    createdAt: str = ""
+    updatedAt: str = ""
+    sourceCount: Optional[int] = None
+
+
 class CanonEntry(BaseModel):
     id: str
     content: str
@@ -175,6 +206,7 @@ class CanonEntry(BaseModel):
     version: Optional[int] = None
     # Older versions, newest first (empty until a memory has been updated).
     history: list[CanonVersion] = Field(default_factory=list)
+    raw: Optional[MemoryMeta] = None
 
 
 class CanonResponse(BaseModel):

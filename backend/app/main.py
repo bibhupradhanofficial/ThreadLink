@@ -2,13 +2,15 @@
 import asyncio
 import json
 import logging
+import math
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from . import memory, pipeline
 from .config import settings
+from .llm import LLMRateLimited
 from .models import (
     BookOut,
     BookSaveRequest,
@@ -22,6 +24,7 @@ from .models import (
     ContradictionsPayload,
     ForgetRequest,
     GraphResponse,
+    MemoryMeta,
     ParagraphCheckRequest,
     ParagraphCheckResponse,
     ResolveRequest,
@@ -38,6 +41,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(LLMRateLimited)
+async def llm_rate_limited_handler(_: Request, exc: LLMRateLimited) -> JSONResponse:
+    """Provider quota exhaustion is expected on free tiers — surface it as a 429
+    the frontend can show, not an opaque 500."""
+    headers = {}
+    if exc.retry_after is not None:
+        # Retry-After is integer seconds, and must round up: rounding 0.4s down
+        # to 0 would tell the client to retry immediately into the same limit.
+        headers["Retry-After"] = str(max(1, math.ceil(exc.retry_after)))
+    return JSONResponse(
+        status_code=429,
+        content={"detail": str(exc), "retryAfter": exc.retry_after},
+        headers=headers,
+    )
 
 
 @app.get("/health")
@@ -102,15 +121,23 @@ async def continuity_check_stream(book_id: str) -> StreamingResponse:
     """SSE: real per-chapter phase events, then the result payload."""
 
     async def gen():
-        async for ev in pipeline.continuity_check_events(book_id):
-            if ev["type"] == "result":
-                payload = {
-                    "type": "result",
-                    "contradictions": [c.model_dump() for c in ev["contradictions"]],
-                }
-            else:
-                payload = ev
-            yield f"data: {json.dumps(payload)}\n\n"
+        # The 200 + SSE headers are already sent once this generator runs, so the
+        # LLMRateLimited handler above can't turn a mid-scan quota failure into a
+        # 429. Emit it as a stream event instead of letting the stream just die.
+        try:
+            async for ev in pipeline.continuity_check_events(book_id):
+                if ev["type"] == "result":
+                    payload = {
+                        "type": "result",
+                        "contradictions": [c.model_dump() for c in ev["contradictions"]],
+                    }
+                else:
+                    payload = ev
+                yield f"data: {json.dumps(payload)}\n\n"
+        except LLMRateLimited as exc:
+            yield "data: " + json.dumps(
+                {"type": "error", "detail": str(exc), "retryAfter": exc.retry_after}
+            ) + "\n\n"
 
     return StreamingResponse(
         gen(),
@@ -121,8 +148,15 @@ async def continuity_check_stream(book_id: str) -> StreamingResponse:
 
 @app.get("/api/books/{book_id}/canon", response_model=CanonResponse)
 async def get_canon(book_id: str) -> CanonResponse:
-    """Story Bible: latest canon entries with their version history."""
+    """Story Bible: latest canon entries with their version history.
+
+    Superseded versions are excluded — they belong to their successor's
+    `history`, not beside it as separate entries. Forgotten memories never come
+    back from the list endpoint at all (verified on 0.0.5, with and without
+    `include.forgottenMemories`), so the filter here is belt-and-braces.
+    """
     raw = await memory.list_memories(book_id)
+    container = memory.book_tag(book_id)
     entries: list[CanonEntry] = []
     for e in raw:
         if e.get("isForgotten") or e.get("isLatest") is False:
@@ -151,6 +185,16 @@ async def get_canon(book_id: str) -> CanonResponse:
                     for h in (e.get("history") or [])
                     if isinstance(h, dict)
                 ],
+                raw=MemoryMeta(
+                    memoryId=str(e.get("id") or ""),
+                    containerTag=container,
+                    version=e.get("version"),
+                    isLatest=e.get("isLatest"),
+                    rootMemoryId=(e.get("rootMemoryId") or None),
+                    createdAt=str(e.get("createdAt") or ""),
+                    updatedAt=str(e.get("updatedAt") or ""),
+                    sourceCount=e.get("sourceCount"),
+                ),
             )
         )
     entries.sort(key=lambda x: (x.entity.lower(), x.chapterIndex or 0, x.attribute))
@@ -177,6 +221,7 @@ async def paragraph_check(book_id: str, req: ParagraphCheckRequest) -> Paragraph
         chapter_title=req.chapterTitle,
         paragraph_text=req.paragraphText,
         preceding_context=req.precedingContext,
+        paragraph_index=req.paragraphIndex,
     )
 
 
