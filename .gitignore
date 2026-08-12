@@ -35,6 +35,9 @@ library.json
 Thumbs.db
 .vscode/
 .idea/
+.agents/
+.agents
+skills-lock.json
 
 # Internal planning docs
 BUILD_PLAN.md

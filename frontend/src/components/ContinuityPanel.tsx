@@ -20,11 +20,9 @@ export function ContinuityPanel({
   onResolve,
 }: {
   bookId: string;
-  // Bumped by the parent when canon changes, so the Story Bible re-fetches.
   canonRefreshKey?: number;
   contradictions: Contradiction[];
   activeContradictionId: string | null;
-  // Bumped by the parent on each editor-mark click to re-trigger the vibrate.
   focusNonce?: number;
   checking: boolean;
   checkPhase: string | null;
@@ -42,41 +40,45 @@ export function ContinuityPanel({
     else cardRefs.current.delete(id);
   };
 
-  // Scroll the clicked mark's card into view and give it a mini vibrate.
   useEffect(() => {
     if (!activeContradictionId) return;
     const el = cardRefs.current.get(activeContradictionId);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     el.classList.remove("card-shake");
-    void el.offsetWidth; // restart the animation when re-clicked
+    void el.offsetWidth;
     el.classList.add("card-shake");
   }, [activeContradictionId, focusNonce]);
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-      <div className="border-b border-border-soft px-5 pt-4 pb-0">
-        <p className="text-sm font-medium text-ink">
-          {tab === "issues"
-            ? "Continuity"
-            : tab === "bible"
-              ? "Story Bible"
-              : "Cast"}
-        </p>
-        <p className="mt-0.5 text-xs text-ink-faint">
+    <aside className="flex w-96 shrink-0 flex-col border-l border-border bg-paper-sunken/40 glass-panel">
+      <div className="border-b border-border-soft px-5 pt-5 pb-0">
+        <div className="flex items-center justify-between">
+          <p className="font-serif text-sm font-bold text-ink">
+            {tab === "issues"
+              ? "Continuity Engine"
+              : tab === "bible"
+                ? "Story Bible Canon"
+                : "Cast Relationship Map"}
+          </p>
+          <span className="flex h-2 w-2 rounded-full bg-gold animate-pulse" />
+        </div>
+        <p className="mt-1 text-xs text-ink-faint">
           {tab === "cast"
-            ? "Who's who and how they connect"
+            ? "Extracted character network & ties"
             : tab === "bible"
-              ? "Everything the story has established"
+              ? "Living canon facts & version history"
               : checking
-                ? "Checking manuscript"
+                ? "Analyzing manuscript claims..."
                 : !checked
-                  ? "Not checked yet"
+                  ? "Awaiting continuity check"
                   : unresolved.length === 0
-                    ? "No open contradictions"
-                    : `${unresolved.length} awaiting a decision`}
+                    ? "All manuscript lines agree"
+                    : `${unresolved.length} open contradictions requiring decision`}
         </p>
-        <div className="mt-3 flex gap-4">
+
+        {/* Tab Buttons */}
+        <div className="mt-4 flex rounded-xl bg-paper-sunken p-1 border border-border-soft">
           {(
             [
               ["issues", "Issues"],
@@ -89,15 +91,15 @@ export function ContinuityPanel({
               type="button"
               onClick={() => setTab(key)}
               className={cn(
-                "cursor-pointer border-b-2 pb-2 text-xs font-medium transition-colors",
+                "flex-1 cursor-pointer rounded-lg py-1.5 text-center text-xs font-semibold transition-all",
                 tab === key
-                  ? "border-ink text-ink"
-                  : "border-transparent text-ink-faint hover:text-ink-soft",
+                  ? "bg-paper-raised text-ink shadow-sm border border-border"
+                  : "text-ink-faint hover:text-ink-soft",
               )}
             >
               {label}
               {key === "issues" && unresolved.length > 0 && (
-                <span className="ml-1 rounded-full bg-flag-soft px-1.5 text-[10px] font-semibold text-flag">
+                <span className="ml-1.5 rounded-full bg-flag-red px-1.5 py-0.2 text-[9px] font-bold text-white">
                   {unresolved.length}
                 </span>
               )}
@@ -106,31 +108,37 @@ export function ContinuityPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-2">
         {tab === "cast" ? (
           <Cast key={bookId} bookId={bookId} />
         ) : tab === "bible" ? (
           <StoryBible key={bookId} bookId={bookId} refreshKey={canonRefreshKey} />
         ) : checking ? (
-          <div className="mt-16 flex flex-col items-center px-6 text-center">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-faint" />
-            <p className="mt-3 animate-pulse text-[13px] text-ink-faint">
+          <div className="mt-20 flex flex-col items-center px-6 text-center">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+            <p className="mt-4 font-serif text-sm font-semibold text-ink">
+              Analyzing Canon Entailment
+            </p>
+            <p className="mt-1 animate-pulse text-xs text-ink-faint">
               {checkPhase}
             </p>
           </div>
         ) : contradictions.length === 0 ? (
-          <div className="mt-16 px-6 text-center">
-            <p className="text-[13px] font-medium text-ink-soft">
-              {checked ? "No contradictions found" : "No contradictions yet"}
+          <div className="mt-20 px-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-kept-soft text-kept text-xl">
+              ✓
+            </div>
+            <p className="mt-4 font-serif text-base font-bold text-ink">
+              {checked ? "Manuscript Canon Verified" : "Ready for Continuity Check"}
             </p>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
+            <p className="mt-2 text-xs leading-relaxed text-ink-soft">
               {checked
-                ? "This manuscript agrees with everything ThreadLink has on record."
-                : "Run a check to compare this manuscript against established canon."}
+                ? "Every line in this manuscript aligns with established story facts on Supermemory."
+                : "Click 'Check Continuity' in the top toolbar to audit manuscript facts."}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border-soft">
+          <div className="space-y-1">
             {unresolved.map((c) => (
               <div key={c.id} ref={setCardRef(c.id)}>
                 <FactCard
@@ -143,9 +151,9 @@ export function ContinuityPanel({
             ))}
 
             {resolved.length > 0 && (
-              <div>
-                <p className="px-5 pt-4 text-xs font-medium text-ink-faint">
-                  Resolved
+              <div className="pt-4">
+                <p className="px-4 text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+                  Resolved Conflicts ({resolved.length})
                 </p>
                 {resolved.map((c) => (
                   <div key={c.id} ref={setCardRef(c.id)}>
@@ -163,12 +171,12 @@ export function ContinuityPanel({
         )}
       </div>
 
-      <div className="border-t border-border-soft px-5 py-3">
+      <div className="border-t border-border-soft px-5 py-3 bg-paper-sunken/60">
         <p className="text-[11px] leading-relaxed text-ink-faint">
-          ThreadLink never overwrites a fact on its own — every contradiction
-          waits for your decision.
+          ✦ Every decision version-bumps Supermemory Cloud memory.
         </p>
       </div>
     </aside>
   );
 }
+

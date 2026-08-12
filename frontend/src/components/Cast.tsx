@@ -5,11 +5,6 @@ import { buildGraph, type GraphEdge, type GraphNode } from "@/lib/api";
 
 type Tie = { relation: string; other: string };
 
-// The graph stores directed edges ("A mother of B"). On B's card that edge has
-// to be flipped, or it reads backwards. Known inverses are phrased naturally;
-// symmetric relations map to themselves so they show on both cards. An unknown
-// relation returns null and its incoming side is dropped — it still appears,
-// correctly oriented, on the source character's card.
 const INVERSE: Record<string, string> = {
   "mother of": "child of",
   "father of": "child of",
@@ -31,8 +26,6 @@ function inverseRelation(relation: string): string | null {
   return INVERSE[relation.trim().toLowerCase()] ?? null;
 }
 
-/** The cast of a book: every character grouped with the relationships canon
- *  established for them. Reads like a character sheet, not a network diagram. */
 export function Cast({ bookId }: { bookId: string }) {
   const [data, setData] = useState<{
     nodes: GraphNode[];
@@ -40,8 +33,6 @@ export function Cast({ bookId }: { bookId: string }) {
   } | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // Fetch on mount (i.e. when the Cast tab is opened) — this is an LLM pass, so
-  // it deliberately does NOT re-run on every keystroke.
   useEffect(() => {
     let cancelled = false;
     buildGraph(bookId)
@@ -58,14 +49,10 @@ export function Cast({ bookId }: { bookId: string }) {
     const ties = new Map<string, Tie[]>();
     for (const n of data.nodes) ties.set(n.id, []);
     for (const e of data.edges) {
-      // Outgoing reads naturally as written: "Elias — older brother of — Corvin".
       ties.get(e.source)?.push({
         relation: e.relation,
         other: labelOf.get(e.target) ?? e.target,
       });
-      // Incoming needs the inverse, or it reads as nonsense ("Elias — mother of
-      // — Adelia"). Show the inverse when we know it; otherwise skip it — the
-      // relationship is already shown, correctly, on the other character's card.
       const inverse = inverseRelation(e.relation);
       if (inverse) {
         ties.get(e.target)?.push({
@@ -74,7 +61,6 @@ export function Cast({ bookId }: { bookId: string }) {
         });
       }
     }
-    // Characters with relationships first, each alphabetical; then anyone isolated.
     return data.nodes
       .map((n) => ({ name: n.label, ties: ties.get(n.id) ?? [] }))
       .sort(
@@ -85,49 +71,74 @@ export function Cast({ bookId }: { bookId: string }) {
 
   if (!data && !failed) {
     return (
-      <p className="mt-16 animate-pulse text-center text-[13px] text-ink-faint">
-        Reading the cast…
-      </p>
+      <div className="mt-16 flex flex-col items-center text-center">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+        <p className="mt-3 font-serif text-xs text-ink-faint">
+          Mapping character ties from Supermemory canon…
+        </p>
+      </div>
     );
   }
 
   if (failed || cast.every((c) => c.ties.length === 0)) {
     return (
       <div className="mt-16 px-6 text-center">
-        <p className="text-[13px] font-medium text-ink-soft">
-          {failed ? "Couldn’t reach the backend" : "No relationships yet"}
+        <p className="font-serif text-sm font-bold text-ink-soft">
+          {failed ? "Supermemory Backend Offline" : "No Cast Ties Extracted Yet"}
         </p>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
+        <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
           {failed
-            ? "The cast is built from canon — check that the backend is running."
-            : "Write scenes that connect your characters — kin, marriages, friendships, jobs — and they’ll appear here."}
+            ? "Verify backend connection at http://localhost:8000."
+            : "Write manuscript scenes linking characters through family, ranks, or rivalries."}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-border-soft">
+    <div className="space-y-3 p-3">
       {cast
         .filter((c) => c.ties.length > 0)
-        .map((c) => (
-          <div key={c.name} className="px-5 py-4">
-            <p className="font-serif text-[15px] font-semibold text-ink">
-              {c.name}
-            </p>
-            <div className="mt-2.5 space-y-1.5">
-              {c.ties.map((t, i) => (
-                <div key={i} className="flex items-baseline gap-2 text-[13px]">
-                  <span className="shrink-0 text-ink-faint">{t.relation}</span>
-                  <span className="min-w-0 flex-1 translate-y-[-3px] border-b border-dotted border-border" />
-                  <span className="shrink-0 font-medium text-ink-soft">
-                    {t.other}
-                  </span>
+        .map((c) => {
+          const initials = c.name
+            .split(" ")
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase();
+
+          return (
+            <div key={c.name} className="rounded-2xl border border-border bg-paper-raised p-3.5 shadow-sm">
+              <div className="flex items-center gap-3 border-b border-border-soft pb-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gold-soft font-bold text-xs text-gold-strong border border-gold/20">
+                  {initials}
                 </div>
-              ))}
+                <div className="min-w-0 flex-1">
+                  <p className="font-serif text-sm font-bold text-ink truncate">
+                    {c.name}
+                  </p>
+                  <p className="text-[10px] font-mono text-ink-faint">
+                    {c.ties.length} {c.ties.length === 1 ? "Relation" : "Relations"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-2.5 space-y-1.5">
+                {c.ties.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg bg-paper-sunken/40 px-2.5 py-1.5 text-xs border border-border-soft">
+                    <span className="font-mono text-[10px] font-semibold uppercase text-ink-faint">
+                      {t.relation}
+                    </span>
+                    <span className="font-serif font-bold text-gold-strong">
+                      {t.other}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
     </div>
   );
 }
+

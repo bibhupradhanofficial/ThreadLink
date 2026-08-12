@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Chapter, Contradiction } from "@/lib/types";
 import { ContradictionMark } from "@/lib/contradiction-mark";
 import { paragraphCheck } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 const TOOLTIP_WIDTH = 288;
 // Debounce before checking (BUILD_PLAN §6).
@@ -412,82 +413,157 @@ export function ManuscriptEditor({
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto w-full max-w-2xl px-6 py-16"
+      className="relative mx-auto w-full max-w-3xl px-8 py-12"
     >
-      <p className="text-xs font-medium text-ink-faint">
-        Chapter {chapter.index}
-      </p>
-      <input
-        value={chapter.title}
-        onChange={(e) => onRename(chapter.id, e.target.value)}
-        placeholder="Untitled"
-        aria-label="Chapter title"
-        className="mt-2 mb-8 w-full bg-transparent font-serif text-[1.75rem] font-semibold tracking-tight text-ink outline-none placeholder:text-ink-faint"
-      />
-      <EditorContent editor={editor} />
+      {/* Manuscript Page Framing Container */}
+      <div className="relative rounded-2xl border border-border bg-paper-raised p-8 shadow-xl shadow-black/5 min-h-[75vh]">
+        {/* Floating Formatting Toolbar */}
+        {editor && (
+          <div className="mb-6 flex items-center justify-between border-b border-border-soft pb-3">
+            <div className="flex items-center gap-1.5 rounded-lg bg-paper-sunken p-1 border border-border-soft">
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded text-xs font-bold transition-colors",
+                  editor.isActive("bold") ? "bg-gold text-white" : "text-ink-soft hover:bg-ink/5",
+                )}
+                title="Bold"
+              >
+                B
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded text-xs italic font-serif transition-colors",
+                  editor.isActive("italic") ? "bg-gold text-white" : "text-ink-soft hover:bg-ink/5",
+                )}
+                title="Italic"
+              >
+                I
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded text-xs font-serif font-bold transition-colors",
+                  editor.isActive("heading", { level: 2 }) ? "bg-gold text-white" : "text-ink-soft hover:bg-ink/5",
+                )}
+                title="Heading"
+              >
+                H2
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded text-xs font-serif transition-colors",
+                  editor.isActive("blockquote") ? "bg-gold text-white" : "text-ink-soft hover:bg-ink/5",
+                )}
+                title="Blockquote"
+              >
+                &ldquo;&rdquo;
+              </button>
+            </div>
 
-      <div className="mt-16 flex items-center border-t border-border-soft pt-5">
-        <div className="flex-1">
-          {prevChapter && (
-            <button
-              type="button"
-              onClick={() => onSelectChapter(prevChapter.id)}
-              className="group cursor-pointer text-left"
-            >
-              <span className="text-[11px] text-ink-faint">← Previous</span>
-              <p className="mt-0.5 text-[13px] font-medium text-ink-soft transition-colors group-hover:text-ink">
-                {prevChapter.title}
-              </p>
-            </button>
-          )}
-        </div>
-        <span className="flex-1 text-center text-xs tabular-nums text-ink-faint">
-          {chapter.wordCount.toLocaleString()} words
-        </span>
-        <div className="flex flex-1 justify-end">
-          {nextChapter && (
-            <button
-              type="button"
-              onClick={() => onSelectChapter(nextChapter.id)}
-              className="group cursor-pointer text-right"
-            >
-              <span className="text-[11px] text-ink-faint">Next →</span>
-              <p className="mt-0.5 text-[13px] font-medium text-ink-soft transition-colors group-hover:text-ink">
-                {nextChapter.title}
-              </p>
-            </button>
-          )}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold tracking-wider text-ink-faint uppercase">
+                CHAPTER {chapter.index}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+            </div>
+          </div>
+        )}
+
+        <input
+          value={chapter.title}
+          onChange={(e) => onRename(chapter.id, e.target.value)}
+          placeholder="Untitled Chapter"
+          aria-label="Chapter title"
+          className="mt-2 mb-8 w-full bg-transparent font-serif text-3xl font-bold tracking-tight text-ink outline-none placeholder:text-ink-faint border-b border-transparent focus:border-gold/30 pb-2"
+        />
+        
+        <EditorContent editor={editor} />
+
+        <div className="mt-16 flex items-center justify-between border-t border-border-soft pt-6">
+          <div className="flex-1">
+            {prevChapter && (
+              <button
+                type="button"
+                onClick={() => onSelectChapter(prevChapter.id)}
+                className="group cursor-pointer text-left"
+              >
+                <span className="text-[10px] uppercase tracking-wider text-ink-faint">← Previous Chapter</span>
+                <p className="mt-0.5 font-serif text-xs font-semibold text-ink-soft transition-colors group-hover:text-gold-strong">
+                  {prevChapter.title}
+                </p>
+              </button>
+            )}
+          </div>
+          <span className="flex-1 text-center font-mono text-xs text-ink-faint">
+            {chapter.wordCount.toLocaleString()} words
+          </span>
+          <div className="flex flex-1 justify-end">
+            {nextChapter && (
+              <button
+                type="button"
+                onClick={() => onSelectChapter(nextChapter.id)}
+                className="group cursor-pointer text-right"
+              >
+                <span className="text-[10px] uppercase tracking-wider text-ink-faint">Next Chapter →</span>
+                <p className="mt-0.5 font-serif text-xs font-semibold text-ink-soft transition-colors group-hover:text-gold-strong">
+                  {nextChapter.title}
+                </p>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Refined Canon Comparison Tooltip Card */}
       {tooltip && tooltipContradiction && (
         <div
-          style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH }}
-          className="animate-fade-in pointer-events-none absolute z-10 rounded-xl border border-border bg-paper-raised p-3 shadow-lg shadow-black/5"
+          style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH + 32 }}
+          className="animate-fade-in pointer-events-none absolute z-30 rounded-2xl border border-flag-red/30 bg-paper-raised p-4 shadow-2xl shadow-black/15 glass-panel"
         >
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-xs font-medium text-ink">
-              {tooltipContradiction.entity}
-            </p>
-            <p className="shrink-0 text-[11px] text-ink-faint">
-              vs. {tooltipContradiction.oldFact.chapterTitle}
-            </p>
+          <div className="flex items-center justify-between border-b border-border-soft pb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-flag-red animate-pulse" />
+              <p className="text-xs font-bold text-flag-red">
+                {tooltipContradiction.entity} Conflict
+              </p>
+            </div>
+            <span className="rounded bg-paper-sunken px-1.5 py-0.5 text-[10px] font-mono text-ink-faint">
+              Ch. {(tooltipContradiction.chapterIndex ?? 0) + 1}
+            </span>
           </div>
-          <p className="mt-2 font-serif text-[13px] italic leading-snug text-ink-soft">
-            &ldquo;{tooltipContradiction.oldFact.excerpt}&rdquo;
-          </p>
-          {tooltipContradiction.reason && (
-            <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-              {tooltipContradiction.reason}
-            </p>
-          )}
-          <p className="mt-2 text-[11px] text-ink-faint">
+
+          <div className="mt-3 space-y-2 text-xs">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Established Canon</span>
+              <p className="mt-0.5 font-serif italic text-ink-soft bg-gold-soft/50 p-2 rounded-lg border border-gold/20">
+                &ldquo;{tooltipContradiction.oldFact.excerpt}&rdquo;
+              </p>
+            </div>
+
+            {tooltipContradiction.reason && (
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Reasoning</span>
+                <p className="mt-0.5 text-ink-soft leading-relaxed">
+                  {tooltipContradiction.reason}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 border-t border-border-soft pt-2 text-[10px] font-semibold text-gold-strong text-center">
             {tooltipContradiction.status === "unresolved"
-              ? "Click to review in the Continuity panel"
+              ? "Click inline highlight to open Continuity panel"
               : tooltipContradiction.status === "kept-old"
-                ? "Resolved — kept the original"
-                : "Resolved — made canon"}
-          </p>
+                ? "Resolved — Kept Canon"
+                : "Resolved — Superseded"}
+          </div>
         </div>
       )}
     </div>

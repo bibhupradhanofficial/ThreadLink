@@ -26,12 +26,20 @@ export function Sidebar({
     ).length;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border">
-      <div className="px-4 pt-4 pb-2">
-        <p className="text-xs font-medium text-ink-faint">Chapters</p>
+    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-paper-sunken/40 glass-panel">
+      <div className="flex items-center justify-between px-4 pt-5 pb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-gold-strong text-xs">📜</span>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-ink-faint">
+            Table of Contents
+          </p>
+        </div>
+        <span className="rounded-md bg-paper-sunken px-1.5 py-0.5 text-[10px] font-semibold text-ink-soft border border-border-soft">
+          {chapters.length} Ch.
+        </span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-2">
+      <nav className="flex-1 overflow-y-auto px-2.5 space-y-1 pb-3">
         {chapters.map((chapter) => {
           const active = chapter.id === activeChapterId;
           const flags = flagsForChapter(chapter.id);
@@ -39,27 +47,41 @@ export function Sidebar({
             <div
               key={chapter.id}
               className={cn(
-                "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                "group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs transition-all",
                 active
-                  ? "bg-ink/[0.06] font-medium text-ink"
-                  : "text-ink-soft hover:bg-ink/[0.03] hover:text-ink",
+                  ? "bg-paper-raised font-semibold text-ink shadow-sm border border-gold/30"
+                  : "text-ink-soft hover:bg-paper-raised/60 hover:text-ink border border-transparent",
               )}
             >
               <button
                 type="button"
                 onClick={() => onSelectChapter(chapter.id)}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
               >
-                <span className="w-4 shrink-0 text-[11px] tabular-nums text-ink-faint">
+                <span
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold tabular-nums",
+                    active
+                      ? "bg-gold/15 text-gold-strong"
+                      : "bg-paper-sunken text-ink-faint group-hover:text-ink-soft",
+                  )}
+                >
                   {chapter.index}
                 </span>
-                <span className="min-w-0 flex-1 truncate">{chapter.title}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-serif text-[13px] leading-snug">{chapter.title}</p>
+                  <p className="text-[10px] text-ink-faint tabular-nums">
+                    {chapter.wordCount.toLocaleString()} words
+                  </p>
+                </div>
               </button>
               {flags > 0 && (
                 <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-flag"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-flag-red text-[9px] font-bold text-white shadow-sm animate-pulse"
                   title={`${flags} unresolved contradiction${flags === 1 ? "" : "s"}`}
-                />
+                >
+                  {flags}
+                </span>
               )}
               {chapters.length > 1 && (
                 <button
@@ -67,9 +89,9 @@ export function Sidebar({
                   onClick={() => onDeleteChapter(chapter.id)}
                   aria-label={`Delete chapter ${chapter.title}`}
                   title="Delete chapter"
-                  className="shrink-0 cursor-pointer rounded p-0.5 text-ink-faint opacity-0 transition-opacity hover:text-flag-red focus:opacity-100 group-hover:opacity-100"
+                  className="shrink-0 cursor-pointer rounded p-1 text-ink-faint opacity-0 transition-opacity hover:text-flag-red focus:opacity-100 group-hover:opacity-100"
                 >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                     <path d="M3 4.5h10M6.5 4.5V3.5a1 1 0 011-1h1a1 1 0 011 1v1M5 4.5l.5 8a1 1 0 001 1h3a1 1 0 001-1l.5-8" />
                   </svg>
                 </button>
@@ -81,18 +103,20 @@ export function Sidebar({
         <button
           type="button"
           onClick={onAddChapter}
-          className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-ink-faint transition-colors hover:bg-ink/[0.03] hover:text-ink-soft"
+          className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-center text-xs font-semibold text-gold-strong transition-all hover:border-gold hover:bg-gold-soft/40"
         >
-          <span className="w-4 shrink-0 text-center">+</span>
-          New chapter
+          <span>+</span>
+          <span>Add Chapter</span>
         </button>
       </nav>
 
-      <div className="border-t border-border-soft px-4 py-3">
-        <p className="text-[11px] tabular-nums text-ink-faint">
-          {chapters.length} chapters · {totalWords.toLocaleString()} words
-        </p>
+      <div className="border-t border-border-soft px-4 py-3.5 bg-paper-sunken/60">
+        <div className="flex items-center justify-between text-[11px] tabular-nums text-ink-faint">
+          <span>Manuscript Stats</span>
+          <span className="font-semibold text-ink-soft">{totalWords.toLocaleString()} words</span>
+        </div>
       </div>
     </aside>
   );
 }
+

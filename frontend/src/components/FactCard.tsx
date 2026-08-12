@@ -20,17 +20,25 @@ function FactRow({
     <button
       type="button"
       onClick={onJump}
-      className="group block w-full cursor-pointer text-left"
+      className={cn(
+        "group block w-full cursor-pointer text-left rounded-xl p-2.5 transition-all border",
+        tone === "old"
+          ? "bg-paper-raised/80 border-border hover:border-gold/40"
+          : "bg-flag-soft/50 border-flag-red/20 hover:border-flag-red/40",
+      )}
     >
-      <span
-        className={cn(
-          "text-[11px]",
-          tone === "old" ? "text-ink-faint" : "font-medium text-flag",
-        )}
-      >
-        {label} · {chapterTitle}
-      </span>
-      <p className="mt-0.5 font-serif text-[13px] italic leading-snug text-ink-soft transition-colors group-hover:text-ink">
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-wider",
+            tone === "old" ? "text-ink-faint" : "text-flag-red",
+          )}
+        >
+          {label}
+        </span>
+        <span className="text-[10px] font-mono text-ink-faint">{chapterTitle}</span>
+      </div>
+      <p className="mt-1 font-serif text-[13px] italic leading-snug text-ink transition-colors group-hover:text-gold-strong">
         &ldquo;{excerpt}&rdquo;
       </p>
     </button>
@@ -50,47 +58,58 @@ export function FactCard({
 }) {
   const { id, entity, oldFact, newFact, status, newFactContent } = contradiction;
   const resolved = status !== "unresolved";
-  // Supermemory read this one out of the prose. It's re-derived on every sync, so
-  // version-bumping it would be wiped — the author fixes the text instead.
   const fromProse = contradiction.oldFactSource === "derived";
 
   return (
     <div
       className={cn(
-        "animate-fade-in px-5 py-4 transition-colors",
-        isActive && "bg-flag-soft/40",
-        resolved && !isActive && "opacity-60",
+        "animate-fade-in p-4 rounded-xl transition-all border my-2 mx-3",
+        isActive
+          ? "bg-paper-raised shadow-md border-gold/50"
+          : "bg-paper-raised/40 border-border-soft hover:border-border",
+        resolved && !isActive && "opacity-75 bg-paper-sunken/40",
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border-soft pb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              resolved ? "bg-kept" : "bg-flag-red animate-pulse",
+            )}
+          />
+          <p className="min-w-0 flex-1 truncate font-serif text-sm font-bold text-ink">
+            {entity}
+          </p>
+        </div>
         <span
           className={cn(
-            "h-1.5 w-1.5 shrink-0 rounded-full",
-            resolved ? "bg-kept" : "bg-flag",
+            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            status === "unresolved"
+              ? "bg-flag-soft text-flag-red border border-flag-red/20"
+              : status === "kept-old"
+                ? "bg-kept-soft text-kept border border-kept/20"
+                : "bg-gold-soft text-gold-strong border border-gold/20",
           )}
-        />
-        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
-          {entity}
-        </p>
-        <span className="shrink-0 text-[11px] text-ink-faint">
+        >
           {status === "unresolved"
-            ? "Unresolved"
+            ? "Action Required"
             : status === "kept-old"
-              ? "Kept original"
-              : "Made canon"}
+              ? "Kept Canon"
+              : "Superseded"}
         </span>
       </div>
 
-      <div className="mt-2.5 space-y-2.5">
+      <div className="mt-3 space-y-2">
         <FactRow
-          label={fromProse ? "Supermemory read" : "Established"}
+          label={fromProse ? "Supermemory Canon" : "Established Canon"}
           chapterTitle={oldFact.chapterTitle}
           excerpt={oldFact.excerpt}
           tone="old"
           onJump={() => onJump(id, oldFact.chapterId)}
         />
         <FactRow
-          label="Contradicts"
+          label="New Claim in Prose"
           chapterTitle={newFact.chapterTitle}
           excerpt={newFact.excerpt}
           tone="new"
@@ -99,40 +118,36 @@ export function FactCard({
       </div>
 
       {status === "kept-new" && (
-        <div className="mt-2.5 rounded-md bg-paper-sunken px-2.5 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-            Version chain
+        <div className="mt-3 rounded-lg border border-gold/30 bg-gold-soft/50 p-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gold-strong">
+            Version Lineage Update
           </p>
-          <p className="mt-1 text-[12px] leading-snug text-ink-faint">
-            <span className="line-through">&ldquo;{oldFact.excerpt}&rdquo;</span>
-            <span> — {oldFact.chapterTitle} · superseded</span>
+          <p className="mt-1 text-[11px] text-ink-faint">
+            <span className="line-through">&ldquo;{oldFact.excerpt}&rdquo;</span> (superseded)
           </p>
-          <p className="mt-0.5 text-[12px] leading-snug text-kept">
-            &ldquo;{newFactContent ?? newFact.excerpt}&rdquo; · current
+          <p className="mt-0.5 font-serif text-xs font-semibold text-kept">
+            &ldquo;{newFactContent ?? newFact.excerpt}&rdquo; (active canon)
           </p>
         </div>
       )}
 
-      <div className="mt-3">
+      <div className="mt-3.5 pt-2 border-t border-border-soft">
         {!resolved ? (
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => onResolve(id, "kept-old")}
-              className="flex-1 cursor-pointer rounded-md border border-border px-2 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
+              className="flex-1 cursor-pointer rounded-lg border border-border bg-paper-raised px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition-all hover:border-gold hover:text-ink"
             >
-              {fromProse ? "Dismiss" : "Keep original"}
+              {fromProse ? "Dismiss Conflict" : "Keep Established Canon"}
             </button>
-            {/* No "Make canon" for a prose-derived memory: it has no curated
-                counterpart to version-bump, and the next sync re-derives it from
-                the chapter anyway — so the fix is to edit the text. */}
             {!fromProse && (
               <button
                 type="button"
                 onClick={() => onResolve(id, "kept-new")}
-                className="flex-1 cursor-pointer rounded-md bg-ink px-2 py-1.5 text-xs font-medium text-paper transition-colors hover:bg-ink/85"
+                className="flex-1 cursor-pointer rounded-lg bg-ink px-2.5 py-1.5 text-xs font-semibold text-paper shadow transition-all hover:bg-gold-strong hover:shadow-md"
               >
-                Make canon
+                Supersede Canon
               </button>
             )}
           </div>
@@ -140,12 +155,13 @@ export function FactCard({
           <button
             type="button"
             onClick={() => onResolve(id, "unresolved")}
-            className="cursor-pointer text-xs text-ink-faint transition-colors hover:text-ink"
+            className="cursor-pointer text-[11px] font-semibold text-ink-faint transition-colors hover:text-gold-strong"
           >
-            Undo
+            ↩ Re-open Decision
           </button>
         )}
       </div>
     </div>
   );
 }
+

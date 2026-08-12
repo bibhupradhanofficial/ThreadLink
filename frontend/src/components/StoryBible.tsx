@@ -10,34 +10,30 @@ import {
   type MemoryMeta,
 } from "@/lib/api";
 
-/** Supermemory's own record for one memory — the audit surface. */
 function RawRecord({ raw }: { raw: MemoryMeta }) {
   return (
-    <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-md bg-paper-sunken px-2 py-1.5 font-mono text-[10px] leading-relaxed text-ink-faint">
-      <dt>memory</dt>
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 rounded-lg border border-border-soft bg-paper-sunken px-2.5 py-2 font-mono text-[10px] leading-relaxed text-ink-faint">
+      <dt className="font-bold">memoryId</dt>
       <dd className="truncate text-ink-soft">{raw.memoryId}</dd>
-      <dt>container</dt>
+      <dt className="font-bold">container</dt>
       <dd className="truncate text-ink-soft">{raw.containerTag}</dd>
-      <dt>version</dt>
-      <dd className="text-ink-soft">
+      <dt className="font-bold">version</dt>
+      <dd className="text-gold-strong font-semibold">
         v{raw.version ?? 1}
-        {raw.isLatest ? " · latest" : ""}
+        {raw.isLatest ? " · active" : ""}
       </dd>
-      {/* Differs from memoryId once a fact has been superseded — this is the
-          link that makes a version chain a chain. */}
       {raw.rootMemoryId && raw.rootMemoryId !== raw.memoryId && (
         <>
-          <dt>root</dt>
+          <dt className="font-bold">rootId</dt>
           <dd className="truncate text-ink-soft">{raw.rootMemoryId}</dd>
         </>
       )}
-      <dt>updated</dt>
+      <dt className="font-bold">updated</dt>
       <dd className="truncate text-ink-soft">{raw.updatedAt}</dd>
     </dl>
   );
 }
 
-/** Canon grouped by entity, with version history and forget-with-reason. */
 export function StoryBible({
   bookId,
   refreshKey = 0,
@@ -49,20 +45,12 @@ export function StoryBible({
   const [failed, setFailed] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  // Audit view: Supermemory's own record per memory. The Story Bible is a view
-  // of the memory layer — this is the proof.
   const [audit, setAudit] = useState(false);
-  // "canon" = facts our extraction curated (entity + attribute + chapter order,
-  // what the judge reasons over). "derived" = what Supermemory made of the raw
-  // prose on its own. Two different extractions of the same manuscript.
   const [tab, setTab] = useState<"canon" | "derived">("canon");
   const [derived, setDerived] = useState<DerivedMemory[] | null>(null);
-
-  // Bumped to re-fetch (e.g. reconciling after a failed forget).
+  const [query, setQuery] = useState("");
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  // Parent remounts this component per book via `key`, so `entries === null`
-  // is the loading state and no synchronous reset is needed here.
   useEffect(() => {
     let cancelled = false;
     getCanon(bookId)
@@ -81,8 +69,6 @@ export function StoryBible({
     };
   }, [bookId, reloadNonce, refreshKey]);
 
-  // Derived memories arrive whenever Supermemory finishes processing the prose
-  // (queued by the full scan), so re-fetch on the same refresh signal as canon.
   useEffect(() => {
     let cancelled = false;
     getDerived(bookId)
@@ -93,86 +79,98 @@ export function StoryBible({
     };
   }, [bookId, reloadNonce, refreshKey]);
 
+  const filteredEntries = useMemo(() => {
+    if (!query.trim()) return entries ?? [];
+    const q = query.toLowerCase();
+    return (entries ?? []).filter(
+      (e) =>
+        e.entity.toLowerCase().includes(q) ||
+        e.content.toLowerCase().includes(q) ||
+        (e.attribute && e.attribute.toLowerCase().includes(q)),
+    );
+  }, [entries, query]);
+
   const groups = useMemo(() => {
     const byEntity = new Map<string, CanonEntry[]>();
-    for (const e of entries ?? []) {
+    for (const e of filteredEntries) {
       const list = byEntity.get(e.entity) ?? [];
       list.push(e);
       byEntity.set(e.entity, list);
     }
     return Array.from(byEntity.entries());
-  }, [entries]);
+  }, [filteredEntries]);
 
   const handleForget = (id: string) => {
     const r = reason.trim() || "Removed from canon by the author";
     setConfirmId(null);
     setReason("");
-    // Optimistic removal; reload to reconcile if the call fails. The reason is
-    // stored on the memory, but 0.0.5 never returns a forgotten memory from the
-    // list endpoint, so there is no tombstone to render here.
     setEntries((prev) => (prev ?? []).filter((e) => e.id !== id));
     forgetMemory(bookId, id, r).catch(() => setReloadNonce((n) => n + 1));
   };
 
-  // Loading only blocks the whole panel before the first canon fetch settles —
-  // once it has, an empty canon must still leave the Derived tab reachable.
   if (entries === null) {
     return (
-      <p className="mt-16 animate-pulse text-center text-[13px] text-ink-faint">
-        Reading the Story Bible…
-      </p>
+      <div className="mt-20 flex flex-col items-center text-center">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+        <p className="mt-3 font-serif text-xs text-ink-faint">
+          Consulting Supermemory Story Bible…
+        </p>
+      </div>
     );
   }
 
   const header = (
-    <div className="border-b border-border-soft px-5 py-2.5">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1">
+    <div className="border-b border-border-soft px-4 py-3 bg-paper-sunken/50">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex rounded-lg bg-paper-sunken p-1 border border-border-soft">
           {(["canon", "derived"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               aria-pressed={tab === t}
-              title={
-                t === "canon"
-                  ? "Facts our extraction curated — what the continuity judge reasons over"
-                  : "What Supermemory made of the raw prose, unaided"
-              }
-              className={`cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
                 tab === t
-                  ? "bg-paper-sunken text-ink"
+                  ? "bg-paper-raised text-ink shadow-sm"
                   : "text-ink-faint hover:text-ink"
               }`}
             >
-              {t === "canon" ? "Canon" : "Derived"}
+              {t === "canon" ? "Curated Canon" : "Derived Pass"}
             </button>
           ))}
         </div>
+
         <button
           type="button"
           onClick={() => setAudit((v) => !v)}
           aria-pressed={audit}
-          title="Show Supermemory's raw memory records"
-          className={`cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-bold transition-all border ${
             audit
-              ? "bg-ink text-paper"
-              : "text-ink-faint hover:bg-paper-sunken hover:text-ink"
+              ? "bg-gold text-white border-gold shadow"
+              : "border-border text-ink-faint hover:bg-paper-raised hover:text-ink"
           }`}
         >
-          Audit
+          Audit JSON
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] leading-snug text-ink-faint">
+
+      {tab === "canon" && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search entities, facts, or attributes..."
+          className="mt-3.5 w-full rounded-xl border border-border bg-paper-raised px-3 py-1.5 font-sans text-xs text-ink outline-none focus:border-gold placeholder:text-ink-faint"
+        />
+      )}
+
+      <p className="mt-2 text-[10px] font-mono text-ink-faint">
         {tab === "canon" ? (
           <>
-            {entries.length} curated {entries.length === 1 ? "fact" : "facts"} ·
-            container <span className="font-mono">book_{bookId}</span>
+            {filteredEntries.length} facts indexed · Tag: <span className="text-gold-strong">book_{bookId}</span>
           </>
         ) : (
           <>
-            {derived?.length ?? 0} derived by Supermemory from the prose itself ·
-            container <span className="font-mono">book_{bookId}:chapters</span>
+            {derived?.length ?? 0} derived memories · Tag: <span className="text-gold-strong">book_{bookId}:chapters</span>
           </>
         )}
       </p>
@@ -184,13 +182,13 @@ export function StoryBible({
       <div>
         {header}
         <div className="mt-16 px-6 text-center">
-          <p className="text-[13px] font-medium text-ink-soft">
-            {failed ? "Couldn’t reach the backend" : "No canon yet"}
+          <p className="font-serif text-sm font-bold text-ink-soft">
+            {failed ? "Supermemory Backend Offline" : "No Canon Facts Established"}
           </p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
+          <p className="mt-2 text-xs leading-relaxed text-ink-faint">
             {failed
-              ? "The Story Bible loads from Supermemory — check that the backend is running."
-              : "Facts are extracted into canon as you write. Start a chapter and they’ll appear here."}
+              ? "Check that backend server is listening at http://localhost:8000."
+              : "As you write manuscript chapters, established facts will automatically index here."}
           </p>
         </div>
       </div>
@@ -202,29 +200,29 @@ export function StoryBible({
       <div>
         {header}
         {derived === null ? (
-          <p className="mt-10 animate-pulse text-center text-[13px] text-ink-faint">
-            Reading…
+          <p className="mt-10 animate-pulse text-center text-xs text-ink-faint">
+            Fetching Supermemory derived memories…
           </p>
         ) : derived.length === 0 ? (
           <div className="mt-10 px-6 text-center">
-            <p className="text-[13px] font-medium text-ink-soft">
-              Supermemory hasn’t read the prose yet
+            <p className="font-serif text-sm font-bold text-ink-soft">
+              Derived Pass Pending
             </p>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-faint">
-              Run a continuity check — the chapters are handed to Supermemory,
-              which derives these on its own. Takes a few seconds after the scan.
+            <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
+              Run a full continuity check to trigger Supermemory reference resolution.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border-soft">
+          <div className="space-y-2 p-3">
             {derived.map((m) => (
-              <div key={m.id} className="px-5 py-3">
-                <p className="font-serif text-[13px] italic leading-snug text-ink-soft">
-                  {m.content}
+              <div key={m.id} className="rounded-xl border border-border bg-paper-raised p-3 shadow-sm">
+                <p className="font-serif text-xs italic leading-relaxed text-ink">
+                  &ldquo;{m.content}&rdquo;
                 </p>
-                <p className="mt-0.5 text-[11px] text-ink-faint">
-                  {m.chapterTitle || "Unknown chapter"}
-                </p>
+                <div className="mt-2 flex items-center justify-between border-t border-border-soft pt-1.5 text-[10px] text-ink-faint">
+                  <span>{m.chapterTitle || "Derived prose memory"}</span>
+                  <span className="font-mono text-gold-strong">Derived</span>
+                </div>
                 {audit && m.raw && <RawRecord raw={m.raw} />}
               </div>
             ))}
@@ -237,100 +235,108 @@ export function StoryBible({
   return (
     <div>
       {header}
-      <div className="divide-y divide-border-soft">
+      <div className="space-y-3 p-3">
         {groups.map(([entity, list]) => (
-        <div key={entity} className="px-5 py-4">
-          <p className="text-[13px] font-medium text-ink">{entity}</p>
-          <div className="mt-2 space-y-3">
-            {list.map((e) => (
-              <div key={e.id} className="group/entry">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-serif text-[13px] italic leading-snug text-ink-soft">
-                      {e.content}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-ink-faint">
-                      {e.attribute && <span>{e.attribute} · </span>}
-                      {e.chapterTitle || "Unknown chapter"}
-                      {(e.version ?? 1) > 1 && (
-                        <span className="ml-1 rounded bg-kept-soft px-1 font-medium text-kept">
-                          v{e.version}
-                        </span>
-                      )}
-                    </p>
-                    {e.history.length > 0 && (
-                      <div className="mt-1 border-l-2 border-border-soft pl-2">
-                        {e.history.map((h, i) => (
-                          <p
-                            key={i}
-                            className="text-[11px] leading-snug text-ink-faint line-through"
-                          >
-                            {h.content}
-                          </p>
-                        ))}
+          <div key={entity} className="rounded-2xl border border-border bg-paper-raised p-3.5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-border-soft pb-2">
+              <span className="font-serif text-sm font-bold text-ink">{entity}</span>
+              <span className="rounded-full bg-gold-soft px-2 py-0.5 text-[10px] font-bold text-gold-strong border border-gold/20">
+                {list.length} {list.length === 1 ? "Fact" : "Facts"}
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {list.map((e) => (
+                <div key={e.id} className="group/entry rounded-xl bg-paper-sunken/40 p-2.5 border border-border-soft">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-serif text-xs italic leading-relaxed text-ink">
+                        &ldquo;{e.content}&rdquo;
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-ink-faint">
+                        {e.attribute && (
+                          <span className="rounded bg-paper px-1.5 py-0.5 font-mono font-semibold text-ink-soft">
+                            {e.attribute}
+                          </span>
+                        )}
+                        <span>{e.chapterTitle || "Chapter fact"}</span>
+                        {(e.version ?? 1) > 1 && (
+                          <span className="rounded bg-kept-soft px-1.5 py-0.5 font-bold text-kept">
+                            v{e.version} Active
+                          </span>
+                        )}
                       </div>
-                    )}
-                    {audit && e.raw && <RawRecord raw={e.raw} />}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setConfirmId(confirmId === e.id ? null : e.id)
-                    }
-                    aria-label="Remove from canon"
-                    title="Remove from canon"
-                    className="shrink-0 cursor-pointer rounded p-0.5 text-ink-faint opacity-0 transition-opacity hover:text-flag group-hover/entry:opacity-100"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.25"
-                      strokeLinecap="round"
-                    >
-                      <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                {confirmId === e.id && (
-                  <div className="animate-fade-in mt-2 rounded-md bg-paper-sunken p-2">
-                    <input
-                      value={reason}
-                      onChange={(ev) => setReason(ev.target.value)}
-                      placeholder="Why is this leaving canon? (optional)"
-                      className="w-full rounded bg-paper px-2 py-1 text-[12px] text-ink outline-none placeholder:text-ink-faint"
-                      autoFocus
-                      onKeyDown={(ev) => {
-                        if (ev.key === "Enter") handleForget(e.id);
-                        if (ev.key === "Escape") setConfirmId(null);
-                      }}
-                    />
-                    <div className="mt-1.5 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmId(null)}
-                        className="cursor-pointer text-[11px] text-ink-faint hover:text-ink"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleForget(e.id)}
-                        className="cursor-pointer rounded bg-flag px-2 py-0.5 text-[11px] font-medium text-paper hover:opacity-85"
-                      >
-                        Forget
-                      </button>
+
+                      {e.history.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-border-soft bg-paper-raised p-2">
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-ink-faint mb-1">
+                            Superseded History Lineage
+                          </p>
+                          {e.history.map((h, i) => (
+                            <p key={i} className="font-serif text-[11px] leading-snug text-ink-faint line-through">
+                              &ldquo;{h.content}&rdquo;
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {audit && e.raw && <RawRecord raw={e.raw} />}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setConfirmId(confirmId === e.id ? null : e.id)}
+                      aria-label="Forget from canon"
+                      title="Forget from canon"
+                      className="shrink-0 cursor-pointer rounded p-1 text-ink-faint opacity-0 transition-opacity hover:text-flag-red group-hover/entry:opacity-100"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {confirmId === e.id && (
+                    <div className="animate-fade-in mt-2.5 rounded-xl border border-flag-red/30 bg-flag-soft p-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-flag-red mb-1">
+                        Forget Fact from Canon
+                      </p>
+                      <input
+                        value={reason}
+                        onChange={(ev) => setReason(ev.target.value)}
+                        placeholder="Reason for deletion (optional)"
+                        className="w-full rounded-lg border border-border bg-paper px-2.5 py-1 text-xs text-ink outline-none focus:border-flag-red placeholder:text-ink-faint"
+                        autoFocus
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter") handleForget(e.id);
+                          if (ev.key === "Escape") setConfirmId(null);
+                        }}
+                      />
+                      <div className="mt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmId(null)}
+                          className="cursor-pointer text-xs font-semibold text-ink-soft hover:text-ink"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleForget(e.id)}
+                          className="cursor-pointer rounded-lg bg-flag-red px-3 py-1 text-xs font-bold text-white shadow hover:bg-flag-red-strong"
+                        >
+                          Confirm Forget
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
         ))}
       </div>
     </div>
   );
 }
+

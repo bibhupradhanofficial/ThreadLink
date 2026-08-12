@@ -1,79 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+
 :root {
-  /* Surfaces — warm near-white neutrals */
-  --color-paper: #fdfdfc;
+  /* Surfaces — warm manuscript parchment neutrals */
+  --color-paper: #f9f8f4;
   --color-paper-raised: #ffffff;
-  --color-paper-sunken: #f5f5f4;
-  --color-border: #e7e5e4;
-  --color-border-soft: #f0efee;
+  --color-paper-sunken: #f1efea;
+  --color-border: #e2ded5;
+  --color-border-soft: #ece8df;
 
   /* Text */
-  --color-ink: #1c1917;
-  --color-ink-soft: #57534e;
-  --color-ink-faint: #a8a29e;
+  --color-ink: #1c1815;
+  --color-ink-soft: #544e47;
+  --color-ink-faint: #9c9489;
 
-  /* Contradiction — muted terracotta */
+  /* Literary Accent — Gold & Bronze */
+  --color-gold: #c28e2b;
+  --color-gold-soft: #f7f1e3;
+  --color-gold-strong: #966915;
+
+  /* Contradiction — vivid crimson terracotta */
   --color-flag: #c2410c;
   --color-flag-soft: #fbeee8;
   --color-flag-strong: #9a3412;
-  /* Red box border for an open (flagged) contradiction */
   --color-flag-red: #dc2626;
   --color-flag-red-strong: #b91c1c;
 
   /* Kept / resolved — muted sage */
-  --color-kept: #4a7c59;
-  --color-kept-soft: #eaf1ec;
+  --color-kept: #3b7a57;
+  --color-kept-soft: #e8f3ec;
 
-  /* Relationship-graph entity nodes — slate blue (not the contradiction orange) */
-  --color-node: #4b6ea8;
+  /* Relationship-graph entity nodes — indigo slate */
+  --color-node: #3b629b;
 }
 
 :root[data-theme="dark"] {
-  --color-paper: #101318;
-  --color-paper-raised: #181c23;
-  --color-paper-sunken: #0b0e12;
-  --color-border: #262b34;
-  --color-border-soft: #1d222a;
+  /* Dark Obsidian Leather Atelier */
+  --color-paper: #0b0d11;
+  --color-paper-raised: #131720;
+  --color-paper-sunken: #07080b;
+  --color-border: #212734;
+  --color-border-soft: #181d27;
 
-  --color-ink: #e7e9ee;
-  --color-ink-soft: #9aa0ac;
-  --color-ink-faint: #676d78;
+  --color-ink: #f0f2f7;
+  --color-ink-soft: #9da5b5;
+  --color-ink-faint: #636b7b;
 
-  --color-flag: #e08856;
-  --color-flag-soft: #33221a;
-  --color-flag-strong: #edac8a;
-  --color-flag-red: #f87171;
+  --color-gold: #e5a93c;
+  --color-gold-soft: #2b2212;
+  --color-gold-strong: #f7c366;
+
+  --color-flag: #ea7a47;
+  --color-flag-soft: #311c14;
+  --color-flag-strong: #f39b71;
+  --color-flag-red: #ef4444;
   --color-flag-red-strong: #fca5a5;
 
-  --color-kept: #85ab8d;
-  --color-kept-soft: #1e2a21;
+  --color-kept: #63b378;
+  --color-kept-soft: #14281c;
 
-  --color-node: #7aa0cf;
+  --color-node: #5a8bd8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-paper: #101318;
-    --color-paper-raised: #181c23;
-    --color-paper-sunken: #0b0e12;
-    --color-border: #262b34;
-    --color-border-soft: #1d222a;
+    --color-paper: #0b0d11;
+    --color-paper-raised: #131720;
+    --color-paper-sunken: #07080b;
+    --color-border: #212734;
+    --color-border-soft: #181d27;
 
-    --color-ink: #e7e9ee;
-    --color-ink-soft: #9aa0ac;
-    --color-ink-faint: #676d78;
+    --color-ink: #f0f2f7;
+    --color-ink-soft: #9da5b5;
+    --color-ink-faint: #636b7b;
 
-    --color-flag: #e08856;
-    --color-flag-soft: #33221a;
-    --color-flag-strong: #edac8a;
-    --color-flag-red: #f87171;
+    --color-gold: #e5a93c;
+    --color-gold-soft: #2b2212;
+    --color-gold-strong: #f7c366;
+
+    --color-flag: #ea7a47;
+    --color-flag-soft: #311c14;
+    --color-flag-strong: #f39b71;
+    --color-flag-red: #ef4444;
     --color-flag-red-strong: #fca5a5;
 
-    --color-kept: #85ab8d;
-    --color-kept-soft: #1e2a21;
+    --color-kept: #63b378;
+    --color-kept-soft: #14281c;
 
-    --color-node: #7aa0cf;
+    --color-node: #5a8bd8;
   }
 }
 
@@ -88,6 +103,10 @@
   --color-ink-soft: var(--color-ink-soft);
   --color-ink-faint: var(--color-ink-faint);
 
+  --color-gold: var(--color-gold);
+  --color-gold-soft: var(--color-gold-soft);
+  --color-gold-strong: var(--color-gold-strong);
+
   --color-flag: var(--color-flag);
   --color-flag-soft: var(--color-flag-soft);
   --color-flag-strong: var(--color-flag-strong);
@@ -99,19 +118,32 @@
 
   --color-node: var(--color-node);
 
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-display: 'Cinzel', serif;
 
   --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 
   @keyframes fade-in {
     from {
       opacity: 0;
-      transform: translateY(2px);
+      transform: translateY(3px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+    }
+    50% {
+      opacity: 0.7;
+      box-shadow: 0 0 4px rgba(239, 68, 68, 0.1);
     }
   }
 }
@@ -135,10 +167,18 @@ html[data-theme="dark"] {
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+  font-family: var(--font-sans);
+  background-image: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-gold) 4%, transparent) 0%, transparent 70%);
 }
 
-/* Theme toggle icons — visibility mirrors the active theme so the
-   component itself can stay stateless (no hydration mismatch). */
+/* Glassmorphism panel utility */
+.glass-panel {
+  background: color-mix(in srgb, var(--color-paper-raised) 85%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Theme toggle icons */
 .theme-icon-sun {
   display: none;
 }
@@ -158,13 +198,13 @@ html[data-theme="dark"] .theme-icon-sun {
 }
 
 ::selection {
-  background: var(--color-ink);
-  color: var(--color-paper);
+  background: var(--color-gold);
+  color: #ffffff;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -181,12 +221,13 @@ html[data-theme="dark"] .theme-icon-sun {
 .manuscript {
   font-family: var(--font-serif);
   color: var(--color-ink);
-  font-size: 1.125rem;
-  line-height: 1.9;
+  font-size: 1.25rem;
+  line-height: 2;
+  letter-spacing: -0.01em;
 }
 
 .manuscript p {
-  margin: 0 0 1.1em;
+  margin: 0 0 1.2em;
 }
 
 .manuscript p.is-editor-empty:first-child::before {
@@ -202,25 +243,13 @@ html[data-theme="dark"] .theme-icon-sun {
   outline: none;
 }
 
-/*
- * A `mark.contradiction` only ever exists in the document because a check
- * confirmed a contradiction for it, so it is RED BY DEFAULT — the instant TipTap
- * paints it from the saved HTML, with no JS class toggle required. This was the
- * fix for red never appearing: the old styling keyed off a `flagged` class added
- * by an effect that raced TipTap's render and usually lost, leaving marks
- * transparent. `resolved` (added once the author decides) overrides back to a
- * quiet dotted underline.
- */
 .manuscript mark.contradiction:not(.resolved) {
-  /* "Marching ants": the red border is drawn as four tiled gradient strips
-     (top, bottom, left, right) whose dash pattern is animated clockwise —
-     a real border can't move, background tiles can. 6px dash / 4px gap. */
   --ant-color: var(--color-flag-red);
-  --ant-thickness: 1.5px;
-  border-radius: 3px;
-  padding: 2px 4px;
+  --ant-thickness: 1.8px;
+  border-radius: 4px;
+  padding: 3px 6px;
   color: var(--color-flag-red-strong);
-  background-color: color-mix(in srgb, var(--color-flag-red) 16%, transparent);
+  background-color: color-mix(in srgb, var(--color-flag-red) 18%, transparent);
   background-image:
     linear-gradient(90deg, var(--ant-color) 0 6px, transparent 6px 10px),
     linear-gradient(90deg, var(--ant-color) 0 6px, transparent 6px 10px),
@@ -233,16 +262,14 @@ html[data-theme="dark"] .theme-icon-sun {
     var(--ant-thickness) 10px;
   background-position: 0 0, 0 100%, 0 0, 100% 0;
   background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-  animation: contradiction-ants 0.8s linear infinite;
-  /* Each line fragment keeps its own box when the excerpt wraps. */
+  animation: contradiction-ants 0.7s linear infinite;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   text-decoration: none;
   cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-flag-red) 15%, transparent);
 }
 
-/* One dash period (10px) per cycle, each edge travelling clockwise:
-   top → right, right edge → down, bottom → left, left edge → up. */
 @keyframes contradiction-ants {
   to {
     background-position: 10px 0, -10px 100%, 0 -10px, 100% 10px;
@@ -252,8 +279,9 @@ html[data-theme="dark"] .theme-icon-sun {
 .manuscript mark.contradiction:not(.resolved):hover,
 .manuscript mark.contradiction:not(.resolved).active {
   --ant-color: var(--color-flag-red-strong);
-  --ant-thickness: 2px;
-  animation-duration: 0.5s;
+  --ant-thickness: 2.2px;
+  background-color: color-mix(in srgb, var(--color-flag-red) 28%, transparent);
+  animation-duration: 0.4s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -261,28 +289,16 @@ html[data-theme="dark"] .theme-icon-sun {
     animation: none;
     background-image: none;
     border: var(--ant-thickness) solid var(--ant-color);
-    padding: 0.5px 3px;
+    padding: 1px 4px;
   }
 }
 
-/* "Mini vibrate" for the Continuity-panel card a clicked editor mark points at. */
 @keyframes card-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  20% {
-    transform: translateX(-3px);
-  }
-  40% {
-    transform: translateX(3px);
-  }
-  60% {
-    transform: translateX(-2px);
-  }
-  80% {
-    transform: translateX(2px);
-  }
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
 }
 
 .card-shake {
@@ -298,8 +314,9 @@ html[data-theme="dark"] .theme-icon-sun {
 .manuscript mark.contradiction.resolved {
   text-decoration: underline;
   text-decoration-style: dotted;
-  text-decoration-color: var(--color-ink-faint);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+  text-decoration-color: var(--color-kept);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
   cursor: pointer;
 }
+
