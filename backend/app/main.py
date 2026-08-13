@@ -31,6 +31,11 @@ from .models import (
     ParagraphCheckResponse,
     ResolveRequest,
     ResolveResponse,
+    SeriesOut,
+    SeriesResponse,
+    SeriesSaveRequest,
+    TimelineEvent,
+    TimelineResponse,
 )
 
 from supermemory import APIConnectionError
@@ -275,6 +280,7 @@ async def build_graph(book_id: str) -> GraphResponse:
 
 @app.post("/api/books/{book_id}/paragraph-check", response_model=ParagraphCheckResponse)
 async def paragraph_check(book_id: str, req: ParagraphCheckRequest) -> ParagraphCheckResponse:
+    series_id = req.seriesId or await memory.get_book_series(book_id)
     return await pipeline.paragraph_check(
         book_id=book_id,
         chapter_id=req.chapterId,
@@ -283,7 +289,132 @@ async def paragraph_check(book_id: str, req: ParagraphCheckRequest) -> Paragraph
         paragraph_text=req.paragraphText,
         preceding_context=req.precedingContext,
         paragraph_index=req.paragraphIndex,
+        series_id=series_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# Series API
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/series", response_model=SeriesResponse)
+async def get_series() -> SeriesResponse:
+    series_list = await memory.list_series()
+    return SeriesResponse(
+        series=[
+            SeriesOut(
+                id=s["id"],
+                title=s["title"],
+                description=s.get("description", ""),
+                bookIds=s.get("bookIds", []),
+            )
+            for s in series_list
+        ]
+    )
+
+
+@app.post("/api/series", response_model=SeriesOut)
+async def create_series(req: SeriesSaveRequest) -> SeriesOut:
+    import uuid
+    series_id = f"s_{uuid.uuid4().hex[:8]}"
+    saved = await memory.save_series(series_id, req.title, req.description or "", req.bookIds)
+    return SeriesOut(
+        id=saved["id"],
+        title=saved["title"],
+        description=saved["description"],
+        bookIds=saved["bookIds"],
+    )
+
+
+@app.put("/api/series/{series_id}", response_model=SeriesOut)
+async def update_series(series_id: str, req: SeriesSaveRequest) -> SeriesOut:
+    saved = await memory.save_series(series_id, req.title, req.description or "", req.bookIds)
+    return SeriesOut(
+        id=saved["id"],
+        title=saved["title"],
+        description=saved["description"],
+        bookIds=saved["bookIds"],
+    )
+
+
+@app.delete("/api/series/{series_id}")
+async def delete_series(series_id: str) -> dict:
+    ok = await memory.delete_series(series_id)
+    return {"ok": ok}
+
+
+# ---------------------------------------------------------------------------
+# Timeline API
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/books/{book_id}/timeline", response_model=TimelineResponse)
+async def get_book_timeline(book_id: str) -> TimelineResponse:
+    raw = await memory.list_memories(book_id)
+    events: list[TimelineEvent] = []
+    for e in raw:
+        if e.get("isForgotten") or e.get("isLatest") is False:
+            continue
+        md = e.get("metadata") or {}
+        time_anchor = md.get("timeAnchor")
+        events.append(
+            TimelineEvent(
+                id=str(e.get("id") or ""),
+                entity=str(md.get("entity") or "General"),
+                statement=str(e.get("memory") or ""),
+                timeAnchor=str(time_anchor) if time_anchor else None,
+                chapterTitle=str(md.get("chapterTitle") or ""),
+                chapterIndex=(
+                    int(md["chapterIndex"])
+                    if str(md.get("chapterIndex", "")).lstrip("-").isdigit()
+                    else None
+                ),
+                bookId=book_id,
+            )
+        )
+    events.sort(key=lambda x: (x.chapterIndex or 0, x.timeAnchor or "", x.entity.lower()))
+    return TimelineResponse(events=events)
+
+
+@app.get("/api/series/{series_id}/timeline", response_model=TimelineResponse)
+async def get_series_timeline(series_id: str) -> TimelineResponse:
+    series_list = await memory.list_series()
+    target_series = next((s for s in series_list if s["id"] == series_id), None)
+    if not target_series:
+        return TimelineResponse(events=[])
+
+    all_events: list[TimelineEvent] = []
+    books = await memory.list_books()
+    books_map = {b["id"]: b["title"] for b in books}
+
+    for book_id in target_series.get("bookIds", []):
+        raw = await memory.list_memories(book_id)
+        b_title = books_map.get(book_id, "Untitled Book")
+        for e in raw:
+            if e.get("isForgotten") or e.get("isLatest") is False:
+                continue
+            md = e.get("metadata") or {}
+            time_anchor = md.get("timeAnchor")
+            all_events.append(
+                TimelineEvent(
+                    id=str(e.get("id") or ""),
+                    entity=str(md.get("entity") or "General"),
+                    statement=str(e.get("memory") or ""),
+                    timeAnchor=str(time_anchor) if time_anchor else None,
+                    chapterTitle=str(md.get("chapterTitle") or ""),
+                    chapterIndex=(
+                        int(md["chapterIndex"])
+                        if str(md.get("chapterIndex", "")).lstrip("-").isdigit()
+                        else None
+                    ),
+                    bookId=book_id,
+                    bookTitle=b_title,
+                )
+            )
+    all_events.sort(key=lambda x: (x.bookTitle or "", x.chapterIndex or 0, x.timeAnchor or "", x.entity.lower()))
+    return TimelineResponse(events=all_events)
+
 
 
 @app.post("/api/books/{book_id}/resolve", response_model=ResolveResponse)

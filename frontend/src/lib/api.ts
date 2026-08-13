@@ -1,7 +1,8 @@
 // Tiny fetch client for the Continuity Editor backend (FastAPI).
 // Base URL is injected at build/runtime via NEXT_PUBLIC_API_URL.
 
-import type { Contradiction } from "./types";
+import type { Contradiction, Series, TimelineEvent } from "./types";
+export type { Series, TimelineEvent };
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -11,6 +12,7 @@ export type ExtractedFact = {
   attribute: string;
   statement: string;
   excerpt: string;
+  time_anchor?: string;
 };
 
 // Superset of the frontend Contradiction type — carries the fields `resolve` needs.
@@ -38,6 +40,7 @@ export type ParagraphCheckInput = {
   paragraphText: string;
   precedingContext?: string;
   paragraphIndex?: number;
+  seriesId?: string;
 };
 
 export async function paragraphCheck(
@@ -339,5 +342,68 @@ export async function getChapters(
     `${API_BASE}/api/books/${encodeURIComponent(bookId)}/chapters`,
   );
   if (!res.ok) throw new Error(`getChapters failed: ${res.status}`);
+  return res.json();
+}
+
+// --- Series & Timeline -----------------------------------------------------
+
+export async function getSeries(): Promise<{ series: Series[] }> {
+  const res = await fetch(`${API_BASE}/api/series`);
+  if (!res.ok) throw new Error(`getSeries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createSeries(data: {
+  title: string;
+  description?: string;
+  bookIds: string[];
+}): Promise<Series> {
+  const res = await fetch(`${API_BASE}/api/series`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`createSeries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateSeries(
+  seriesId: string,
+  data: { title: string; description?: string; bookIds: string[] },
+): Promise<Series> {
+  const res = await fetch(`${API_BASE}/api/series/${encodeURIComponent(seriesId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`updateSeries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteSeries(seriesId: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${API_BASE}/api/series/${encodeURIComponent(seriesId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`deleteSeries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getBookTimeline(
+  bookId: string,
+): Promise<{ events: TimelineEvent[] }> {
+  const res = await fetch(
+    `${API_BASE}/api/books/${encodeURIComponent(bookId)}/timeline`,
+  );
+  if (!res.ok) throw new Error(`getBookTimeline failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getSeriesTimeline(
+  seriesId: string,
+): Promise<{ events: TimelineEvent[] }> {
+  const res = await fetch(
+    `${API_BASE}/api/series/${encodeURIComponent(seriesId)}/timeline`,
+  );
+  if (!res.ok) throw new Error(`getSeriesTimeline failed: ${res.status}`);
   return res.json();
 }

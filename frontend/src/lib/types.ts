@@ -43,3 +43,22 @@ export type Contradiction = {
   // so the author resolves it by fixing the text rather than making it canon.
   oldFactSource?: "curated" | "derived";
 };
+
+export type Series = {
+  id: string;
+  title: string;
+  description?: string;
+  bookIds: string[];
+};
+
+export type TimelineEvent = {
+  id: string;
+  entity: string;
+  statement: string;
+  timeAnchor?: string | null;
+  chapterTitle: string;
+  chapterIndex?: number | null;
+  bookId?: string | null;
+  bookTitle?: string | null;
+};
+

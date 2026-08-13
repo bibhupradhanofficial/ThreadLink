@@ -28,16 +28,21 @@ def chapters_tag(book_id: str) -> str:
     return f"book_{book_id}:chapters"
 
 
+def series_tag(series_id: str) -> str:
+    return f"series_{series_id}"
+
+
 async def search_facts(
     q: str,
     book_id: str,
     *,
+    series_id: Optional[str] = None,
     chapter_index_lt: Optional[int] = None,
     threshold: float = 0.4,
     limit: int = 8,
 ) -> list[dict]:
     """Search curated canon. `chapter_index_lt` enforces 'earlier chapters are canon'."""
-    return await _search_container(
+    hits = await _search_container(
         q,
         book_tag(book_id),
         "curated",
@@ -45,30 +50,36 @@ async def search_facts(
         threshold=threshold,
         limit=limit,
     )
+    if series_id:
+        series_hits = await _search_container(
+            q,
+            series_tag(series_id),
+            "curated",
+            chapter_index_lt=None,
+            threshold=threshold,
+            limit=limit,
+        )
+        seen = {h["id"] for h in hits}
+        for sh in series_hits:
+            if sh["id"] not in seen:
+                hits.append(sh)
+                seen.add(sh["id"])
+    return hits
 
 
 async def search_derived(
     q: str,
     book_id: str,
     *,
+    series_id: Optional[str] = None,
     chapter_index_lt: Optional[int] = None,
     threshold: float = 0.4,
     limit: int = 4,
 ) -> list[dict]:
     """Search what Supermemory derived from the prose — a second, independent
     reading of the same manuscript.
-
-    Our extraction is structured but brittle: it names the same man `Elias`,
-    `Elias Reyes` and `Reyes`, and a fact it simply misses is canon we never had.
-    Supermemory's reading resolves references consistently and has higher recall,
-    so it covers exactly those gaps. Derived memories carry the same numeric
-    chapterIndex, so the 'earlier chapters are canon' filter applies identically.
-
-    Evidence, not canon: these carry no entity/attribute (so they are never
-    revision targets) and no verbatim excerpt, and they are deleted and re-derived
-    on every prose sync — so a contradiction against one can only be advisory.
     """
-    return await _search_container(
+    hits = await _search_container(
         q,
         chapters_tag(book_id),
         "derived",
@@ -76,6 +87,22 @@ async def search_derived(
         threshold=threshold,
         limit=limit,
     )
+    if series_id:
+        series_hits = await _search_container(
+            q,
+            series_tag(series_id),
+            "derived",
+            chapter_index_lt=None,
+            threshold=threshold,
+            limit=limit,
+        )
+        seen = {h["id"] for h in hits}
+        for sh in series_hits:
+            if sh["id"] not in seen:
+                hits.append(sh)
+                seen.add(sh["id"])
+    return hits
+
 
 
 async def _search_container(
@@ -229,9 +256,55 @@ def _read_library() -> dict:
     try:
         data = json.loads(_LIBRARY_PATH.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"books": {}}
+        return {"books": {}, "series": {}}
     data.setdefault("books", {})
+    data.setdefault("series", {})
     return data
+
+
+async def list_series() -> list[dict]:
+    async with _library_lock:
+        data = _read_library()
+    return [
+        {
+            "id": sid,
+            "title": s.get("title") or "Untitled Series",
+            "description": s.get("description") or "",
+            "bookIds": s.get("bookIds") or [],
+        }
+        for sid, s in data.get("series", {}).items()
+    ]
+
+
+async def save_series(series_id: str, title: str, description: str = "", book_ids: list[str] | None = None) -> dict:
+    async with _library_lock:
+        data = _read_library()
+        series_item = data.setdefault("series", {}).setdefault(series_id, {})
+        series_item["title"] = title
+        series_item["description"] = description
+        series_item["bookIds"] = book_ids or []
+        _write_library(data)
+    return {"id": series_id, "title": title, "description": description, "bookIds": book_ids or []}
+
+
+async def delete_series(series_id: str) -> bool:
+    async with _library_lock:
+        data = _read_library()
+        if series_id in data.get("series", {}):
+            del data["series"][series_id]
+            _write_library(data)
+            return True
+        return False
+
+
+async def get_book_series(book_id: str) -> Optional[str]:
+    async with _library_lock:
+        data = _read_library()
+    for sid, s in data.get("series", {}).items():
+        if book_id in (s.get("bookIds") or []):
+            return sid
+    return None
+
 
 
 def _write_library(data: dict) -> None:

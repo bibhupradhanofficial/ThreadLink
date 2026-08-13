@@ -17,12 +17,13 @@ self-contained sentence. Store these:
   - physical appearance & traits (eye/hair color, facial hair, scars, height, species, age)
   - RANK, ROLE, TITLE, JOB, or AUTHORITY ("Voss is a sergeant", "Mara is queen")
   - relationships, kinship, and allegiances ("Elena is John's daughter")
-  - world/history facts and dates ("the western wall was sealed 300 years ago")
+  - world/history facts, timeline dates, and relative ages ("the western wall was sealed 300 years ago", "Year 302", "3 days after the battle")
   - object states and possessions ("Reyes has the silver key", "the sword is shattered")
   - physical locations ("Captain Reyes is at the north gate")
   - DURABLE STATE CHANGES — injuries, deaths, limbs lost, things breaking. Store the RESULTING
     state ("Reyes lost both his legs at Varek Ridge and cannot walk", "the king is dead").
-Each fact: {"entity","attribute","statement","excerpt"}.
+Each fact: {"entity","attribute","statement","excerpt","time_anchor"}.
+(time_anchor is optional: include if paragraph explicitly states a year, date, relative offset, or age).
 
 CLAIMS = assertions or actions that presuppose a state, capability, or location canon might track.
 Never stored in memory, only checked against established canon.
@@ -33,7 +34,7 @@ Emit a claim whenever an action or statement presupposes:
   - physical location presence
   - role authority or title
   - facial hair or physical attribute presupposition ("shaved her beard" -> presupposes having a beard)
-Each claim: {"entity","presupposedState","excerpt"}.
+Each claim: {"entity","presupposedState","excerpt","time_anchor"}.
 
 RULES:
 - One sentence per item. Resolve pronouns to entity names using context.
@@ -44,8 +45,8 @@ RULES:
 
 EXAMPLES:
 
-Paragraph: "Captain Reyes sprinted across the courtyard toward the north gate."
--> {"facts":[{"entity":"Reyes","attribute":"location","statement":"Captain Reyes is at the courtyard near the north gate.","excerpt":"sprinted across the courtyard"}],"claims":[{"entity":"Reyes","presupposedState":"Reyes can run and walk (has functioning legs)","excerpt":"sprinted across the courtyard"}]}
+Paragraph: "In Year 302, Captain Reyes sprinted across the courtyard toward the north gate."
+-> {"facts":[{"entity":"Reyes","attribute":"location","statement":"Captain Reyes is at the courtyard near the north gate.","excerpt":"sprinted across the courtyard","time_anchor":"Year 302"}],"claims":[{"entity":"Reyes","presupposedState":"Reyes can run and walk (has functioning legs)","excerpt":"sprinted across the courtyard","time_anchor":"Year 302"}]}
 
 Paragraph: "Behind her, Sergeant Voss cursed the heat. He was young for a sergeant, but he wore the rank like it had been stitched to his skin."
 -> {"facts":[{"entity":"Voss","attribute":"rank","statement":"Voss holds the rank of sergeant.","excerpt":"Sergeant Voss"},{"entity":"Voss","attribute":"age","statement":"Voss is young for a sergeant.","excerpt":"young for a sergeant"}],"claims":[]}
@@ -88,10 +89,12 @@ For each item, decide its verdict against its canon:
   - "consistent"    : compatible with canon; it extends or refines canon.
   - "contradiction" : it conflicts with canon.
 
-CONTRADICTION INCLUDES ENTAILMENT VIOLATIONS, not just direct opposites:
+CONTRADICTION INCLUDES ENTAILMENT VIOLATIONS AND TIMELINE PARADOXES:
   - Physical capability: If canon states an entity lost legs, is dead, is blind, or is mute, any claim/fact where they run, sprint, walk, see, or speak is a CONTRADICTION.
   - Eye/Hair/Physical trait: Canon "grey eyes" vs new "green eyes" is a CONTRADICTION.
-  - Location: Canon "Reyes is locked in the dungeon in Chapter 1" vs new "Reyes is walking in the garden" without travel is a CONTRADICTION.
+  - Location & Travel speed: Canon "Reyes is locked in the dungeon in Chapter 1" vs new "Reyes is walking in the distant capital" without elapsed travel time is a CONTRADICTION.
+  - Timeline & Age paradoxes: Canon "Elena is 30 years old in Year 302" vs new "Elena is 20 years old in Year 305" or character age regression is a CONTRADICTION.
+  - Causal Event Sequence: Event B requiring Event A to happen first, but occurring before Event A in chronological timeline anchors, is a CONTRADICTION.
   - Counting & totals: Canon "had 3 sons but 1 died" vs new "all 3 sons greeted her" is a CONTRADICTION.
   - Commonsense defaults: A young human girl having a beard to shave is a CONTRADICTION unless world rules state otherwise.
 

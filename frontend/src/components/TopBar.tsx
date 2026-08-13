@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
 import { ThreadLinkLogo } from "./Logo";
-import type { Book } from "@/lib/types";
+import type { Book, Series } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SaveState = "saved" | "saving" | "offline";
@@ -207,6 +207,111 @@ function BookSwitcher({
   );
 }
 
+function SeriesSwitcher({
+  seriesList = [],
+  activeSeriesId,
+  onSelectSeries,
+  onCreateSeries,
+}: {
+  seriesList?: Series[];
+  activeSeriesId?: string;
+  onSelectSeries?: (id: string) => void;
+  onCreateSeries?: (title: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const activeSeries = seriesList.find((s) => s.id === activeSeriesId);
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-lg bg-gold-soft/40 px-2 py-1 text-xs font-semibold text-gold-strong transition-all hover:bg-gold-soft border border-gold/20"
+      >
+        <span className="text-[10px]">📚</span>
+        <span className="truncate max-w-[120px] font-serif">{activeSeries?.title || "Series Thread"}</span>
+      </button>
+
+      {open && (
+        <div className="animate-fade-in absolute left-0 top-full z-50 mt-1.5 w-60 rounded-xl border border-border bg-paper-raised p-2.5 shadow-2xl">
+          <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-ink-faint mb-1.5">
+            Book Series Lore Sharing
+          </p>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectSeries?.("");
+                setOpen(false);
+              }}
+              className={`w-full text-left rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${!activeSeriesId ? "bg-gold-soft font-bold text-gold-strong" : "text-ink-soft hover:bg-paper-sunken"
+                }`}
+            >
+              Standalone (Book Thread Only)
+            </button>
+            {seriesList.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  onSelectSeries?.(s.id);
+                  setOpen(false);
+                }}
+                className={`w-full text-left rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors truncate ${s.id === activeSeriesId ? "bg-gold-soft font-bold text-gold-strong" : "text-ink-soft hover:bg-paper-sunken"
+                  }`}
+              >
+                {s.title} ({s.bookIds?.length ?? 0} Books)
+              </button>
+            ))}
+          </div>
+
+          <div className="my-2 border-t border-border-soft" />
+
+          <div className="flex gap-1.5">
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="New Series Name..."
+              className="w-full rounded-lg border border-border bg-paper-sunken px-2.5 py-1 text-xs text-ink outline-none focus:border-gold placeholder:text-ink-faint"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTitle.trim()) {
+                  onCreateSeries?.(newTitle.trim());
+                  setNewTitle("");
+                  setOpen(false);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (newTitle.trim()) {
+                  onCreateSeries?.(newTitle.trim());
+                  setNewTitle("");
+                  setOpen(false);
+                }
+              }}
+              className="rounded-lg bg-gold px-2.5 py-1 text-xs font-bold text-white shadow hover:bg-gold-strong"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TopBar({
   books,
   activeBookId,
@@ -214,6 +319,10 @@ export function TopBar({
   onAddBook,
   onRenameBook,
   onDeleteBook,
+  seriesList,
+  activeSeriesId,
+  onSelectSeries,
+  onCreateSeries,
   chapterTitle,
   saveState,
   aiError,
@@ -229,6 +338,10 @@ export function TopBar({
   onAddBook: () => void;
   onRenameBook: (id: string, title: string) => void;
   onDeleteBook: (id: string) => void;
+  seriesList?: Series[];
+  activeSeriesId?: string;
+  onSelectSeries?: (id: string) => void;
+  onCreateSeries?: (title: string) => void;
   chapterTitle: string;
   saveState: SaveState;
   aiError?: string | null;
@@ -260,6 +373,13 @@ export function TopBar({
             onAddBook={onAddBook}
             onRenameBook={onRenameBook}
             onDeleteBook={onDeleteBook}
+          />
+          <span className="text-xs text-ink-faint">/</span>
+          <SeriesSwitcher
+            seriesList={seriesList}
+            activeSeriesId={activeSeriesId}
+            onSelectSeries={onSelectSeries}
+            onCreateSeries={onCreateSeries}
           />
           <span className="text-xs text-ink-faint">/</span>
           <span className="min-w-0 truncate font-serif text-xs font-medium text-ink-soft max-w-[160px]">

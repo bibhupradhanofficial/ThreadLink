@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getCanon,
   getDerived,
+  getBookTimeline,
   forgetMemory,
   type CanonEntry,
   type DerivedMemory,
   type MemoryMeta,
+  type TimelineEvent,
 } from "@/lib/api";
 
 function RawRecord({ raw }: { raw: MemoryMeta }) {
@@ -46,8 +48,9 @@ export function StoryBible({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [audit, setAudit] = useState(false);
-  const [tab, setTab] = useState<"canon" | "derived">("canon");
+  const [tab, setTab] = useState<"canon" | "derived" | "timeline">("canon");
   const [derived, setDerived] = useState<DerivedMemory[] | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[] | null>(null);
   const [query, setQuery] = useState("");
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -74,6 +77,16 @@ export function StoryBible({
     getDerived(bookId)
       .then((res) => !cancelled && setDerived(res.memories))
       .catch(() => !cancelled && setDerived([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId, reloadNonce, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getBookTimeline(bookId)
+      .then((res) => !cancelled && setTimelineEvents(res.events))
+      .catch(() => !cancelled && setTimelineEvents([]));
     return () => {
       cancelled = true;
     };
@@ -123,7 +136,7 @@ export function StoryBible({
     <div className="border-b border-border-soft px-4 py-3 bg-paper-sunken/50">
       <div className="flex items-center justify-between gap-2">
         <div className="flex rounded-lg bg-paper-sunken p-1 border border-border-soft">
-          {(["canon", "derived"] as const).map((t) => (
+          {(["canon", "derived", "timeline"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -135,7 +148,7 @@ export function StoryBible({
                   : "text-ink-faint hover:text-ink"
               }`}
             >
-              {t === "canon" ? "Curated Canon" : "Derived Pass"}
+              {t === "canon" ? "Curated Canon" : t === "derived" ? "Derived Pass" : "Timeline"}
             </button>
           ))}
         </div>
@@ -168,9 +181,13 @@ export function StoryBible({
           <>
             {filteredEntries.length} facts indexed · Tag: <span className="text-gold-strong">book_{bookId}</span>
           </>
-        ) : (
+        ) : tab === "derived" ? (
           <>
             {derived?.length ?? 0} derived memories · Tag: <span className="text-gold-strong">book_{bookId}:chapters</span>
+          </>
+        ) : (
+          <>
+            {timelineEvents?.length ?? 0} timeline events recorded
           </>
         )}
       </p>
@@ -191,6 +208,54 @@ export function StoryBible({
               : "As you write manuscript chapters, established facts will automatically index here."}
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (tab === "timeline") {
+    return (
+      <div>
+        {header}
+        {timelineEvents === null ? (
+          <p className="mt-10 animate-pulse text-center text-xs text-ink-faint">
+            Loading story timeline...
+          </p>
+        ) : timelineEvents.length === 0 ? (
+          <div className="mt-10 px-6 text-center">
+            <p className="font-serif text-sm font-bold text-ink-soft">
+              No Timeline Anchors Yet
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
+              As facts with time expressions (dates, ages, relative offsets) are extracted, they will build an interactive story timeline here.
+            </p>
+          </div>
+        ) : (
+          <div className="relative border-l-2 border-gold/30 ml-6 my-4 space-y-6 pr-4">
+            {timelineEvents.map((ev, i) => (
+              <div key={ev.id || i} className="relative pl-6">
+                <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-gold bg-paper-raised" />
+                <div className="rounded-xl border border-border bg-paper-raised p-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 border-b border-border-soft pb-1.5 mb-2">
+                    <span className="font-mono text-xs font-bold text-gold-strong">
+                      {ev.timeAnchor || "Chapter Event"}
+                    </span>
+                    <span className="rounded bg-paper px-2 py-0.5 font-mono text-[10px] font-semibold text-ink-faint">
+                      {ev.chapterTitle || `Chapter ${ev.chapterIndex ?? "?"}`}
+                    </span>
+                  </div>
+                  <p className="font-serif text-xs leading-relaxed text-ink font-medium">
+                    &ldquo;{ev.statement}&rdquo;
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-[10px]">
+                    <span className="rounded-full bg-gold-soft px-2 py-0.5 font-bold text-gold-strong">
+                      {ev.entity}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

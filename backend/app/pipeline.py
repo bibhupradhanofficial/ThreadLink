@@ -41,6 +41,7 @@ async def paragraph_check(
     paragraph_text: str,
     preceding_context: str | None = None,
     paragraph_index: int | None = None,
+    series_id: str | None = None,
 ) -> ParagraphCheckResponse:
     # Extraction is pure LLM work on the paragraph — no shared state, so it runs
     # outside the lock and concurrent checks only serialize the canon phase.
@@ -50,7 +51,7 @@ async def paragraph_check(
     async with _book_locks[book_id]:
         return await _check_against_canon(
             book_id, chapter_id, chapter_index, chapter_title, facts, claims,
-            paragraph_index,
+            paragraph_index, series_id,
         )
 
 
@@ -62,46 +63,33 @@ async def _check_against_canon(
     facts: list[Fact],
     claims: list[Claim],
     paragraph_index: int | None = None,
+    series_id: str | None = None,
 ) -> ParagraphCheckResponse:
-    # 1. All searches concurrently. Facts search ≤ current chapter in ONE query:
-    # earlier-chapter hits are canon (judged), same-chapter hits are dedupe/revision
-    # targets — otherwise every re-check of an edited paragraph re-stores its facts.
-    #
-    # Supermemory's reading of the prose backs our own up, but only where ours is
-    # blind. Our extraction is structured (entity + attribute + a verbatim excerpt
-    # to highlight) but it drops facts and fragments one character into `Elias`,
-    # `Elias Reyes` and `Reyes`; a fact it missed is canon we never had, and no
-    # amount of searching finds it. Supermemory's reading resolves references and
-    # recalls more, and carries the same numeric chapterIndex, so the same
-    # 'earlier chapters are canon' filter applies.
-    #
-    # Fallback, not merge: derived memories are longer and richer, so when both
-    # contain the same fact the derived one wins on similarity and the judge cites
-    # it — and a derived memory has no curated counterpart to version-bump, which
-    # would silently turn a resolvable contradiction into an advisory one. So it
-    # only speaks when curated canon has nothing to say. Searches are local and
-    # free; this costs latency, not tokens.
     async def search_fact(f: Fact) -> list[dict]:
         q = f"{f.entity} {f.attribute}: {f.statement}"
-        hits = await memory.search_facts(q, book_id, chapter_index_lt=chapter_index + 1)
+        if f.time_anchor:
+            q += f" ({f.time_anchor})"
+        hits = await memory.search_facts(q, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1)
         if not hits:
             hits = await memory.search_derived(
-                q, book_id, chapter_index_lt=chapter_index + 1
+                q, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1
             )
         if not hits:
             hits = await memory.search_facts(
-                f.entity, book_id, chapter_index_lt=chapter_index + 1
+                f.entity, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1
             )
         return hits
 
     async def search_claim(c: Claim) -> list[dict]:
         q = f"{c.entity}: {c.presupposedState}"
-        hits = await memory.search_facts(q, book_id, chapter_index_lt=chapter_index + 1)
+        if c.time_anchor:
+            q += f" ({c.time_anchor})"
+        hits = await memory.search_facts(q, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1)
         if not hits:
-            hits = await memory.search_derived(q, book_id, chapter_index_lt=chapter_index + 1)
-        if not hits:  # last resort: a plain entity search over curated canon
+            hits = await memory.search_derived(q, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1)
+        if not hits:
             hits = await memory.search_facts(
-                c.entity, book_id, chapter_index_lt=chapter_index + 1
+                c.entity, book_id, series_id=series_id, chapter_index_lt=chapter_index + 1
             )
         return hits
 
@@ -539,6 +527,7 @@ def _to_memory_payload(
                 "chapterIndex": chapter_index,  # number → numeric filters work
                 "chapterTitle": chapter_title,
                 "excerpt": f.excerpt,
+                "timeAnchor": f.time_anchor,
             },
         }
         for f in facts
@@ -588,9 +577,15 @@ def _build_pending(
         # Derived memories are restatements, not substrings, so they have no
         # excerpt — the memory text itself is the most faithful thing to show.
         excerpt=str(md.get("excerpt") or canon["memory"]),
+        timeAnchor=md.get("timeAnchor"),
     )
     new_content = obj.statement if kind == "fact" else obj.presupposedState
-    new_ref = FactRef(chapterId=chapter_id, chapterTitle=chapter_title, excerpt=obj.excerpt)
+    new_ref = FactRef(
+        chapterId=chapter_id,
+        chapterTitle=chapter_title,
+        excerpt=obj.excerpt,
+        timeAnchor=getattr(obj, "time_anchor", None),
+    )
     pid = _pending_id(
         kind, chapter_id, obj.entity, getattr(obj, "attribute", None), new_content
     )
@@ -606,6 +601,7 @@ def _build_pending(
         kind=kind,  # type: ignore[arg-type]
         attribute=getattr(obj, "attribute", None),
         chapterIndex=chapter_index,
+        timeAnchor=getattr(obj, "time_anchor", None),
         reason=reason,
         paragraphIndex=paragraph_index,
         oldFactSource=canon.get("source") or "curated",  # type: ignore[arg-type]

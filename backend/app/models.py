@@ -14,6 +14,7 @@ class Fact(BaseModel):
     attribute: str = Field(description="Short attribute slug, e.g. 'eye color', 'rank'")
     statement: str = Field(description="One self-contained sentence stating the fact")
     excerpt: str = Field(description="Verbatim substring of the paragraph")
+    time_anchor: Optional[str] = Field(default=None, description="Temporal marker e.g. 'Year 302' or '3 days later'")
 
 
 class Claim(BaseModel):
@@ -22,6 +23,7 @@ class Claim(BaseModel):
     entity: str
     presupposedState: str = Field(description="The state/capability the claim assumes true")
     excerpt: str = Field(description="Verbatim substring of the paragraph")
+    time_anchor: Optional[str] = Field(default=None, description="Temporal marker e.g. 'Year 302' or '3 days later'")
 
 
 class ExtractionResult(BaseModel):
@@ -54,6 +56,7 @@ class FactRef(BaseModel):
     chapterId: str
     chapterTitle: str
     excerpt: str
+    timeAnchor: Optional[str] = None
 
 
 class Contradiction(BaseModel):
@@ -76,6 +79,7 @@ class PendingContradiction(Contradiction):
     # keeps a numeric chapterIndex (else future chapterIndex-filtered searches miss it).
     attribute: Optional[str] = None
     chapterIndex: Optional[int] = None
+    timeAnchor: Optional[str] = None
     # The judge's short explanation of the conflict — shown on hover in the editor.
     reason: Optional[str] = None
     # Which paragraph produced this. A re-check of the same paragraph supersedes
@@ -104,6 +108,40 @@ class ParagraphCheckRequest(BaseModel):
     # Position of this paragraph in the chapter; scopes supersession (see
     # PendingContradiction.paragraphIndex).
     paragraphIndex: Optional[int] = None
+    seriesId: Optional[str] = None
+
+
+class SeriesOut(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = ""
+    bookIds: list[str] = Field(default_factory=list)
+
+
+class SeriesResponse(BaseModel):
+    series: list[SeriesOut] = Field(default_factory=list)
+
+
+class SeriesSaveRequest(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    bookIds: list[str] = Field(default_factory=list)
+
+
+class TimelineEvent(BaseModel):
+    id: str
+    entity: str
+    statement: str
+    timeAnchor: Optional[str] = None
+    chapterTitle: str = ""
+    chapterIndex: Optional[int] = None
+    bookId: Optional[str] = None
+    bookTitle: Optional[str] = None
+
+
+class TimelineResponse(BaseModel):
+    events: list[TimelineEvent] = Field(default_factory=list)
+
 
 
 class ParagraphCheckResponse(BaseModel):

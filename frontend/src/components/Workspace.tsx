@@ -5,18 +5,21 @@ import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { ManuscriptEditor } from "./ManuscriptEditor";
 import { ContinuityPanel } from "./ContinuityPanel";
-import type { Book, Chapter, Contradiction, ContradictionStatus } from "@/lib/types";
+import type { Book, Chapter, Contradiction, ContradictionStatus, Series } from "@/lib/types";
 import {
   continuityCheck,
   continuityCheckStream,
+  createSeries,
   deleteBook,
   deleteChapter,
   getBooks,
   getContradictions,
+  getSeries,
   resolveContradiction,
   saveBook,
   saveChapter,
   saveContradictions,
+  updateSeries,
 } from "@/lib/api";
 
 const RESULT_STAGGER = 240;
@@ -51,6 +54,8 @@ function newChapter(index: number): Chapter {
 export function Workspace() {
   // The library lives in Supermemory; empty until the mount effect loads it.
   const [books, setBooks] = useState<Book[]>([]);
+  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [activeSeriesId, setActiveSeriesId] = useState<string>("");
   const [activeBookId, setActiveBookId] = useState("");
   const [activeChapterId, setActiveChapterId] = useState("");
   // Continuity results per book; a book with no entry has never been checked.
@@ -78,6 +83,30 @@ export function Workspace() {
   // Story Bible re-fetches instead of showing a stale snapshot.
   const [canonNonce, setCanonNonce] = useState(0);
   const bumpCanon = useCallback(() => setCanonNonce((n) => n + 1), []);
+
+  const handleCreateSeries = useCallback(async (title: string) => {
+    try {
+      const created = await createSeries({ title, bookIds: activeBookId ? [activeBookId] : [] });
+      setSeriesList((prev) => [...prev, created]);
+      setActiveSeriesId(created.id);
+    } catch {
+      // Backend offline no-op
+    }
+  }, [activeBookId]);
+
+  const handleSelectSeries = useCallback((id: string) => {
+    setActiveSeriesId(id);
+    if (id && activeBookId) {
+      const seriesItem = seriesList.find((s) => s.id === id);
+      if (seriesItem && !seriesItem.bookIds.includes(activeBookId)) {
+        const updatedBookIds = [...seriesItem.bookIds, activeBookId];
+        updateSeries(id, { title: seriesItem.title, description: seriesItem.description, bookIds: updatedBookIds }).catch(() => {});
+        setSeriesList((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, bookIds: updatedBookIds } : s)),
+        );
+      }
+    }
+  }, [activeBookId, seriesList]);
 
   // A mark click hands off to the Continuity panel: open it if closed, then
   // vibrate the matching card.
@@ -453,8 +482,9 @@ export function Workspace() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await getBooks();
+        const [res, sRes] = await Promise.all([getBooks(), getSeries().catch(() => ({ series: [] }))]);
         if (cancelled) return;
+        if (sRes.series) setSeriesList(sRes.series);
         if (res.books.length > 0) {
           const loaded: Book[] = res.books.map((b) => ({
             id: b.id,
@@ -557,6 +587,10 @@ export function Workspace() {
         onAddBook={handleAddBook}
         onRenameBook={handleRenameBook}
         onDeleteBook={handleDeleteBook}
+        seriesList={seriesList}
+        activeSeriesId={activeSeriesId}
+        onSelectSeries={handleSelectSeries}
+        onCreateSeries={handleCreateSeries}
         chapterTitle={activeChapter.title}
         saveState={saveState}
         aiError={aiError}

@@ -41,13 +41,13 @@ Most memory demos are "ingest documents, embed, retrieve nearest chunks." That's
 vector database. ThreadLink leans on the parts of Supermemory a plain vector store
 **doesn't have**:
 
-| Supermemory capability | How ThreadLink uses it | Why a vector DB can't |
-|---|---|---|
-| **Container tags** | One tag per book (`book_{id}`) isolates each manuscript's canon. | Namespacing exists, but it's the least of it. |
-| **Numeric metadata filters** | Every fact carries its `chapterIndex`; retrieval filters `chapterIndex < current`, so chapter 4 is only ever judged against chapters 1–3. **"Earlier chapters are canon" is enforced by the query, not hoped for in a prompt.** | Returns nearest chunks regardless of when they were written. No temporal ordering. |
-| **Version chains + history** | Accepting a change version-bumps the memory (`update_memory`): the old value is kept with `isLatest=false` and a `rootMemoryId`, so a promotion *supersedes* rather than *overwrites*. The Story Bible renders the full lineage. | Overwrites or duplicates. No first-class "this replaced that, here's the history." |
-| **Extraction from raw prose** | Chapters are handed to Supermemory, which derives its own memories and **resolves references** — "His daughter Mira" becomes "Captain Elias Reyes has a daughter named Mira." Used as a fallback when our own extraction is blind. | Embeds text; it doesn't read it into resolved, structured facts. |
-| **Forget with a reason** | Cutting a chapter forgets its facts with an audit reason, so they stop haunting later chapters. | Delete is delete; no soft-delete with provenance. |
+| Supermemory capability              | How ThreadLink uses it                                                                                                                                                                                                                     | Why a vector DB can't                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| **Container tags**            | One tag per book (`book_{id}`) isolates each manuscript's canon.                                                                                                                                                                         | Namespacing exists, but it's the least of it.                                      |
+| **Numeric metadata filters**  | Every fact carries its`chapterIndex`; retrieval filters `chapterIndex < current`, so chapter 4 is only ever judged against chapters 1–3. **"Earlier chapters are canon" is enforced by the query, not hoped for in a prompt.**  | Returns nearest chunks regardless of when they were written. No temporal ordering. |
+| **Version chains + history**  | Accepting a change version-bumps the memory (`update_memory`): the old value is kept with `isLatest=false` and a `rootMemoryId`, so a promotion *supersedes* rather than *overwrites*. The Story Bible renders the full lineage. | Overwrites or duplicates. No first-class "this replaced that, here's the history." |
+| **Extraction from raw prose** | Chapters are handed to Supermemory, which derives its own memories and**resolves references** — "His daughter Mira" becomes "Captain Elias Reyes has a daughter named Mira." Used as a fallback when our own extraction is blind.   | Embeds text; it doesn't read it into resolved, structured facts.                   |
+| **Forget with a reason**      | Cutting a chapter forgets its facts with an audit reason, so they stop haunting later chapters.                                                                                                                                            | Delete is delete; no soft-delete with provenance.                                  |
 
 **What's ours, honestly:** the *continuity judgment* — entailment ("no legs ⇒ can't
 sprint"), supersession vs. reversion (promotion is fine; demotion back to a
@@ -125,7 +125,6 @@ npm run dev
 - **API** → http://localhost:8000/health
 - **Supermemory Cloud** → https://api.supermemory.ai
 
-
 **Try it:** open the editor, paste a few chapters, and hit **Check Continuity**.
 Canon builds as it reads; contradictions light up red. Write a character a
 wheelchair in chapter one, then have them run in chapter four, and watch the line
@@ -138,10 +137,10 @@ flag itself.
 Two independent LLM configs, so Supermemory and our pipeline can use different
 providers:
 
-| File | Powers | Key variables |
-|---|---|---|
-| `.env` (root) | Supermemory's extraction of memories from prose | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` |
-| `backend/.env` | Our fact extraction + contradiction judging | `EXTRACTOR_MODEL`, provider key (e.g. `GEMINI_API_KEY`), optional `EXTRACTOR_API_BASE` |
+| File             | Powers                                          | Key variables                                                                                |
+| ---------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `.env` (root)  | Supermemory's extraction of memories from prose | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`                                    |
+| `backend/.env` | Our fact extraction + contradiction judging     | `EXTRACTOR_MODEL`, provider key (e.g. `GEMINI_API_KEY`), optional `EXTRACTOR_API_BASE` |
 
 `EXTRACTOR_MODEL` is any LiteLLM string — `gemini/gemini-3.6-flash`, `groq/llama-3.3-70b-versatile`, `openai/gpt-4o`, etc. See each `*.env.example` for the full set.
 
@@ -203,5 +202,5 @@ exactly one daughter.
 
 ## Credits
 
-Built on [Supermemory Cloud](https://supermemory.ai). Continuity reasoning, the
+Built with [Supermemory Cloud](https://supermemory.ai). Continuity reasoning, the
 two-reading retrieval model, and the editor are ThreadLink's own.

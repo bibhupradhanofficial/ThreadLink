@@ -40,6 +40,6 @@ Thumbs.db
 skills-lock.json
 
 # Internal planning docs
-BUILD_PLAN.md
-ISSUES.md
-DEMO.md
+docs/
+new-features.md
+
