@@ -43,34 +43,30 @@ vector database. ThreadLink leans on the parts of Supermemory a plain vector sto
 
 | Supermemory capability              | How ThreadLink uses it                                                                                                                                                                                                                     | Why a vector DB can't                                                              |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| **Container tags**            | One tag per book (`book_{id}`) isolates each manuscript's canon.                                                                                                                                                                         | Namespacing exists, but it's the least of it.                                      |
-| **Numeric metadata filters**  | Every fact carries its`chapterIndex`; retrieval filters `chapterIndex < current`, so chapter 4 is only ever judged against chapters 1–3. **"Earlier chapters are canon" is enforced by the query, not hoped for in a prompt.**  | Returns nearest chunks regardless of when they were written. No temporal ordering. |
-| **Version chains + history**  | Accepting a change version-bumps the memory (`update_memory`): the old value is kept with `isLatest=false` and a `rootMemoryId`, so a promotion *supersedes* rather than *overwrites*. The Story Bible renders the full lineage. | Overwrites or duplicates. No first-class "this replaced that, here's the history." |
-| **Extraction from raw prose** | Chapters are handed to Supermemory, which derives its own memories and**resolves references** — "His daughter Mira" becomes "Captain Elias Reyes has a daughter named Mira." Used as a fallback when our own extraction is blind.   | Embeds text; it doesn't read it into resolved, structured facts.                   |
-| **Forget with a reason**      | Cutting a chapter forgets its facts with an audit reason, so they stop haunting later chapters.                                                                                                                                            | Delete is delete; no soft-delete with provenance.                                  |
+| **Container tags**                  | `book_{id}` isolates each manuscript's canon. Parent `series_{id}` tags allow multi book series to share overarching lore while keeping volume specific facts isolated.                                                                     | Namespacing exists, but it's the least of it.                                      |
+| **Numeric & temporal metadata filters** | Every fact carries its `chapterIndex` and `time_anchor`; retrieval filters `chapterIndex < current`, so chapter 4 is only ever judged against earlier chapters. **"Earlier chapters are canon" is enforced by the query, not hoped for in a prompt.** | Returns nearest chunks regardless of when they were written. No temporal ordering. |
+| **Version chains + history**        | Accepting a change version-bumps the memory (`update_memory`): the old value is kept with `isLatest=false` and a `rootMemoryId`, so a promotion *supersedes* rather than *overwrites*. The Story Bible renders the full lineage. | Overwrites or duplicates. No first-class "this replaced that, here's the history." |
+| **Extraction from raw prose**       | Chapters are handed to Supermemory, which derives its own memories and **resolves references** — "His daughter Mira" becomes "Captain Elias Reyes has a daughter named Mira." Used as a fallback when our own extraction is blind.   | Embeds text; it doesn't read it into resolved, structured facts.                   |
+| **Forget with a reason**            | Cutting a chapter forgets its facts with an audit reason, so they stop haunting later chapters.                                                                                                                                            | Delete is delete; no soft-delete with provenance.                                  |
 
 **What's ours, honestly:** the *continuity judgment* — entailment ("no legs ⇒ can't
-sprint"), supersession vs. reversion (promotion is fine; demotion back to a
-superseded rank is a contradiction), monotonic age. That reasoning is a prompt layer
+sprint"), timeline paradoxes (travel speed vs distance, age regressions, sequence conflicts), supersession vs. reversion, monotonic age. That reasoning is a prompt layer
 on top of what Supermemory returns. **Supermemory is the memory; the judgment is
 ours.** We don't claim it detects contradictions — we claim it makes detecting them
 possible.
 
-### Two readings of the same manuscript
+### Two readings of the same manuscript (and multi book series)
 
 ThreadLink extracts canon two independent ways and plays them against each other:
 
-- **Curated** (`book_{id}`) — our LLM extracts structured facts with a verbatim
-  excerpt (what the red highlight anchors to) and an entity/attribute (what the
-  numeric filter and judge need). Precise, but brittle: it can fragment one
+- **Curated** (`book_{id}` / `series_{id}`) — our LLM extracts structured facts with a verbatim
+  excerpt (what the red highlight anchors to), entity attributes, and time anchors. Precise, but brittle: it can fragment one
   character into `Elias` / `Elias Reyes` / `Reyes`, and a fact it misses is canon we
   never had.
 - **Derived** (`book_{id}:chapters`) — Supermemory reads the prose itself and
   resolves references consistently, with higher recall.
 
-When curated canon comes up empty on a query, the checker **falls back to
-Supermemory's reading**. Two passes over the same book: ours knows the exact words
-to underline; Supermemory's actually knows who everyone is.
+When checking a manuscript belonging to a series, the query searches both `book_{id}` and `series_{id}` containers simultaneously so Book Two automatically inherits Book One lore. When curated canon comes up empty on a query, the checker **falls back to Supermemory's reading**.
 
 ---
 
@@ -79,10 +75,12 @@ to underline; Supermemory's actually knows who everyone is.
 ThreadLink architecture
 
 **The live loop** (per paragraph, as you type): extract facts + claims → search
-canon filtered to earlier chapters → judge each against its canon → store new facts
+canon filtered to earlier chapters and parent series → judge each against its canon (including intra paragraph fusion) → store new facts
 or version-bump changed ones → flag contradictions inline. Worst case is exactly
 **two LLM calls** per paragraph (extract + one batched judge), regardless of how
 many facts it contains.
+
+**Multi Model Resilience:** the LLM client automatically retries and cycles through fallback models (`gemini/gemini-3.6-flash`, `gemini/gemini-flash-latest`, `gemini/gemini-3.5-flash-lite`) if rate limits (HTTP 429) occur.
 
 **Why prose lives in `library.json`:** Supermemory Cloud documents are write-once on the
 API server (re-adding a `customId` doesn't replace content), so editable
@@ -93,7 +91,7 @@ edits.
 ### Stack
 
 - **Frontend** — Next.js (App Router) · TypeScript · Tailwind v4 · TipTap
-- **Backend** — Python · FastAPI · LiteLLM (extraction + judging, e.g. `gemini/gemini-3.6-flash`, `groq/llama-3.3-70b-versatile`, or `openai/gpt-4o`)
+- **Backend** — Python · FastAPI · LiteLLM (extraction + judging with multi model fallback, e.g. `gemini/gemini-3.6-flash`, `groq/llama-3.3-70b-versatile`, or `openai/gpt-4o`)
 - **Memory** — Supermemory Cloud API (`https://api.supermemory.ai`)
 
 ---
@@ -158,6 +156,7 @@ providers:
 │       └── main.py       #   API routes
 ├── frontend/             # Next.js editor, Story Bible, Cast, landing page
 │   └── src/components/   #   ManuscriptEditor, StoryBible, Cast, ContinuityPanel
+├── docs/specs/           # Architecture decision specs (0001, 0002, 0003)
 ├── docker-compose.yml    # supermemory + backend + frontend
 └── .env.example          # Supermemory provider key
 ```
@@ -168,12 +167,15 @@ providers:
 
 - **Live continuity checking** — every paragraph is checked as you write; the
   offending phrase is flagged red inline, with the conflicting earlier line on hover.
+- **Timeline and Chronology Tracker** — extracts dates, relative time anchors, and event sequences; flags impossible travel speeds, age regressions, and temporal paradoxes.
+- **Multi Book Series Lore Sharing** — parent series container tags (`series_{id}`) let Book Two inherit Book One canon automatically while keeping volume specific lore isolated.
 - **Full-book scan** — streams per-chapter progress, builds canon end to end, and
   surfaces cross-chapter contradictions on a manuscript it's never seen.
 - **Reasoned verdicts** — entailment violations, promotion-vs-reversion, immutable
-  attributes, monotonic age — not keyword matching.
-- **Story Bible** — a live, auditable view of canon in Supermemory: current facts,
-  full version history, and the raw memory record (id, container, version, root).
+  attributes, monotonic age, temporal sequence — not keyword matching.
+- **Multi-Model LLM Resilience** — cycles through fallback models on HTTP 429 rate limits so checking never silently stalls.
+- **Story Bible & Timeline View** — live, auditable view of canon in Supermemory, full version history, plus an interactive vertical timeline of story events and character age progression.
+- **Series Switcher** — toggle between single volume canon and full multi volume series lore.
 - **Cast** — a relationship graph (kin, ranks, workplaces) drawn from canon, no
   tagging required.
 - **Author-in-the-loop resolution** — you decide whether a new value supersedes the
